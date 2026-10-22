@@ -4029,6 +4029,14 @@ export const useStore = create<AppStore>((set, get) => ({
       // A folder that is present but won't open falls through to the SAME
       // prompt as before, but only after the org is active: the prompt's
       // resolution enables sync from the session, so it must name this vault.
+      // The server activation runs BESIDE the folder open (#E): every route the
+      // sync path uses (vault token, per-doc sync token, registry listings,
+      // locks, the vault channel) authorizes by MEMBERSHIP and names the org
+      // explicitly; only panel routes (join code, MCP token, a POST /vaults
+      // without an org) read the session's active org. Settled here so a
+      // rejection is only ever observed by the awaits below.
+      const activation = authManager.api.setActiveOrganization(organizationId);
+      activation.catch(() => {});
       const bound = readOrgVaults()[organizationId];
       const boundOk = !!bound && (await ipc.folderExists(bound).catch(() => false));
       if (superseded()) return;
@@ -4046,24 +4054,37 @@ export const useStore = create<AppStore>((set, get) => ({
         if (openError === null) set({ switchingVault: null });
       }
 
-      await authManager.api.setActiveOrganization(organizationId);
-      if (superseded()) return;
-      const session = await authManager.currentSession();
-      if (superseded()) return;
-      set({ session });
-
       if (boundOk && openError === null) {
+        // The folder is open: start its sync now instead of after two serial
+        // round trips (activate, re-read the session). `enableSyncForVault`
+        // reads the org from the session, so name the new org on the local
+        // session first; the server's answer replaces it below.
+        const prior = get().session;
+        if (prior && prior.activeOrganizationId !== organizationId) {
+          set({ session: { ...prior, activeOrganizationId: organizationId } });
+        }
+        void get()
+          .enableSyncForVault({ background: true })
+          .catch((e) => console.warn("[sync] enable after switch failed", e));
+        await activation;
+        if (superseded()) return;
+        const confirmed = await authManager.currentSession();
+        if (superseded()) return;
+        set({ session: confirmed });
         // Roster + seat usage feed the members and billing panels, not the tree,
         // and the reconcile is the part that scales with the vault: none of them
         // is worth making the user wait for. Each swallows its own errors and
         // gates its state writes on this still being the open vault.
         void get().refreshVault();
         void get().refreshOrgBilling();
-        void get()
-          .enableSyncForVault({ background: true })
-          .catch((e) => console.warn("[sync] enable after switch failed", e));
         return;
       }
+
+      await activation;
+      if (superseded()) return;
+      const session = await authManager.currentSession();
+      if (superseded()) return;
+      set({ session });
 
       await get().refreshVault();
       if (superseded()) return;
