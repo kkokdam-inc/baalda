@@ -991,6 +991,7 @@ function SyncIndicator({
   const lastSyncedAt = useStore((s) => s.lastSyncedAt);
   const pending = useStore((s) => s.syncPending);
   const progress = useStore((s) => s.syncProgress);
+  const vaultStatus = useStore((s) => s.vaultSyncStatus);
   const rootMissing = useStore((s) => s.structureNotice.rootMissing);
   const syncPause = useStore((s) => s.syncPause);
   // The folder is gone (#228) or the shrink brake holds our writes (#252):
@@ -1011,6 +1012,7 @@ function SyncIndicator({
       pending={pending}
       progress={progress}
       noteOpen={noteOpen}
+      vaultStatus={vaultStatus}
       rootMissing={rootMissing}
       pause={syncPause}
     />

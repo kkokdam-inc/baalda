@@ -35,7 +35,7 @@ export function syncRunPercent(progress: SyncProgress | null | undefined): numbe
  * Activity panel, the banners), and `syncManager.syncFailures()` is left
  * untouched. What the pill shows instead is the state that is still true: the
  * open note's own connection ("Synced" / "Syncing…" / "Retrying…" / "Offline"),
- * or "Synced" for the vault-wide pill once the run has stopped.
+ * or, for the vault-wide pill, the vault channel's live status.
  *
  * (It used to keep a run with no failed note, or one with refused notes or a
  * failing pull, as `error` and read "Sync incomplete" with a "Sync now"
@@ -64,9 +64,10 @@ export function pillProgress(
  * progress exists to kill.
  *
  * `noteOpen: false` puts the pill in vault-wide mode: `status` belongs to a
- * socket that doesn't exist, so the label is derived from `progress` alone —
- * counter while running, "Synced" once the run has stopped (see
- * {@link pillProgress}).
+ * socket that doesn't exist, so the label comes from `progress` while a run is
+ * live (the counter) and from `vaultStatus`, the vault channel's own live
+ * connection, once it has stopped (see {@link vaultWideLabel}). The pill never
+ * says "Synced" for the vault unless that channel is synced.
  */
 export function syncBadgeLabel(args: {
   status: string;
@@ -78,8 +79,11 @@ export function syncBadgeLabel(args: {
   progress?: SyncProgress | null;
   /** False when the pill stands for the vault, not an open note. */
   noteOpen?: boolean;
+  /** The vault channel's live status (`store.vaultSyncStatus`): what the
+   *  vault-wide pill reports once no run is live. */
+  vaultStatus?: string;
 }): string {
-  const { status, pending, lastSyncedAt, now, enabled, noteOpen } = args;
+  const { status, pending, lastSyncedAt, now, enabled, noteOpen, vaultStatus } = args;
   const progress = pillProgress(args.progress);
   if (progress?.phase === "removing") {
     return `Updating access · ${Math.max(0, progress.total - progress.done).toLocaleString()} remaining`;
@@ -118,9 +122,7 @@ export function syncBadgeLabel(args: {
     // an impossible "585/164".
     return `Syncing ${Math.min(progress.done, progress.total)}/${progress.total} updates`;
   }
-  if (noteOpen === false) {
-    return progress?.phase === "done" ? "Synced" : "Syncing…";
-  }
+  if (noteOpen === false) return vaultWideLabel(vaultStatus, enabled);
   if (status === "synced") {
     if (pending) return "Syncing…";
     return lastSyncedAt != null ? `Synced · ${relativeAgo(lastSyncedAt, now)}` : "Synced";
@@ -140,8 +142,10 @@ export function syncBadgeTone(args: {
   progress?: SyncProgress | null;
   /** False when the pill stands for the vault, not an open note. */
   noteOpen?: boolean;
+  /** See {@link syncBadgeLabel}. */
+  vaultStatus?: string;
 }): string {
-  const { status, noteOpen } = args;
+  const { status, noteOpen, vaultStatus } = args;
   const progress = pillProgress(args.progress);
   if (progress?.phase === "removing") return "connecting";
   if (noteOpen !== false && (status === "no-access" || status === "read-only")) {
@@ -150,10 +154,42 @@ export function syncBadgeTone(args: {
   // Red, not amber: nothing about these resolves on its own.
   if (status === "too-large" || status === "deleted") return "error";
   if (isSyncRunActive(progress)) return "connecting";
-  if (noteOpen === false) {
-    return progress?.phase === "done" ? "synced" : "connecting";
-  }
+  if (noteOpen === false) return vaultWideTone(vaultStatus);
   return status;
+}
+
+/**
+ * The vault-wide pill once no run is live: the vault channel's own connection,
+ * never a hard-coded "Synced". A channel still opening or backfilling reads
+ * "Syncing…", a dropped one "Retrying…", no channel at all "Offline" (or
+ * "Local only" with sync off).
+ */
+function vaultWideLabel(vaultStatus: string | undefined, enabled: boolean | undefined): string {
+  switch (vaultStatus) {
+    case "synced":
+      return "Synced";
+    case "connecting":
+      return "Syncing…";
+    case "error":
+      return "Retrying…";
+    case "no-access":
+      return "No access";
+    default:
+      return enabled === false ? "Local only" : "Offline";
+  }
+}
+
+/** Tone for {@link vaultWideLabel}, so the colour matches the words. */
+function vaultWideTone(vaultStatus: string | undefined): string {
+  switch (vaultStatus) {
+    case "synced":
+    case "connecting":
+    case "error":
+    case "no-access":
+      return vaultStatus;
+    default:
+      return "offline";
+  }
 }
 
 /**
@@ -212,6 +248,7 @@ export function SyncBadge({
   pending,
   progress,
   noteOpen,
+  vaultStatus,
   rootMissing,
   pause,
 }: {
@@ -225,8 +262,10 @@ export function SyncBadge({
    *  with a determinate bar. Omit for a pill that only tracks the connection. */
   progress?: SyncProgress | null;
   /** False when the pill stands for the vault, not an open note: socket-derived
-   *  states are skipped and the label comes from `progress` alone. */
+   *  states are skipped and the label comes from `progress` and `vaultStatus`. */
   noteOpen?: boolean;
+  /** The vault channel's live status — see {@link syncBadgeLabel}. */
+  vaultStatus?: string;
   /** The vault folder is gone — see {@link syncBadgeHold}. */
   rootMissing?: boolean;
   /** The server's shrink brake (`store.syncPause`) — see {@link syncBadgeHold}. */
@@ -246,8 +285,9 @@ export function SyncBadge({
     enabled,
     progress,
     noteOpen,
+    vaultStatus,
   });
-  const tone = syncBadgeTone({ status, progress, noteOpen });
+  const tone = syncBadgeTone({ status, progress, noteOpen, vaultStatus });
   // A determinate fill whenever the run knows its own size; the pre-existing
   // indeterminate slide covers "working, size unknown" (connecting, saving).
   const percent = running ? syncRunPercent(progress) : null;

@@ -162,11 +162,11 @@ describe("syncBadgeLabel with a bulk sync run", () => {
     ).toBe("Synced · just now");
     expect(syncBadgeTone({ status: "synced", progress: failedRun })).toBe("synced");
     expect(
-      syncBadgeLabel({ status: "offline", now, noteOpen: false, progress: failedRun }),
+      syncBadgeLabel({ status: "offline", now, noteOpen: false, vaultStatus: "synced", progress: failedRun }),
     ).toBe("Synced");
-    expect(syncBadgeTone({ status: "offline", noteOpen: false, progress: failedRun })).toBe(
-      "synced",
-    );
+    expect(
+      syncBadgeTone({ status: "offline", noteOpen: false, vaultStatus: "synced", progress: failedRun }),
+    ).toBe("synced");
     // Genuine connectivity states still win over the settled run.
     expect(syncBadgeLabel({ status: "error", now, progress: failedRun })).toBe("Retrying…");
     expect(syncBadgeLabel({ status: "offline", now, progress: failedRun })).toBe("Offline");
@@ -221,7 +221,7 @@ describe("syncBadgeLabel with a bulk sync run", () => {
     }
   });
 
-  it("stays honest with no note open: the label comes from the run alone", () => {
+  it("stays honest with no note open: the run, then the vault channel", () => {
     // The header pill is now mounted vault-wide. With no note open, `status`
     // belongs to a socket that doesn't exist — it must never leak into the label.
     expect(
@@ -237,6 +237,7 @@ describe("syncBadgeLabel with a bulk sync run", () => {
         status: "offline",
         now,
         noteOpen: false,
+        vaultStatus: "synced",
         progress: run({ phase: "done", done: 500, total: 500 }),
       }),
     ).toBe("Synced");
@@ -245,6 +246,7 @@ describe("syncBadgeLabel with a bulk sync run", () => {
         status: "synced",
         now,
         noteOpen: false,
+        vaultStatus: "synced",
         progress: run({ phase: "error", done: 480, total: 500, failed: 20 }),
       }),
     ).toBe("Synced");
@@ -268,12 +270,18 @@ describe("syncBadgeLabel with a bulk sync run", () => {
       }),
     ).toBe("connecting");
     expect(
-      syncBadgeTone({ status: "offline", noteOpen: false, progress: run({ phase: "done" }) }),
+      syncBadgeTone({
+        status: "offline",
+        noteOpen: false,
+        vaultStatus: "synced",
+        progress: run({ phase: "done" }),
+      }),
     ).toBe("synced");
     expect(
       syncBadgeTone({
         status: "synced",
         noteOpen: false,
+        vaultStatus: "synced",
         progress: run({ phase: "error", failed: 3 }),
       }),
     ).toBe("synced");
@@ -284,6 +292,43 @@ describe("syncBadgeLabel with a bulk sync run", () => {
         progress: run({ done: 1, total: 9 }),
       }),
     ).toBe("connecting");
+  });
+
+  // A stopped run says nothing about the channel: with no note open the pill
+  // reads the vault channel's live status and never claims Synced on its own.
+  it("never says Synced for the vault unless the vault channel is synced", () => {
+    const stopped = run({ phase: "done", done: 500, total: 500 });
+    const failed = run({ phase: "error", done: 0, total: 0, failed: 0 });
+    for (const progress of [stopped, failed, null]) {
+      const label = (vaultStatus?: string, enabled?: boolean) =>
+        syncBadgeLabel({ status: "synced", now, noteOpen: false, vaultStatus, enabled, progress });
+      const tone = (vaultStatus?: string) =>
+        syncBadgeTone({ status: "synced", noteOpen: false, vaultStatus, progress });
+      expect(label("synced")).toBe("Synced");
+      expect(tone("synced")).toBe("synced");
+      expect(label("connecting")).toBe("Syncing…");
+      expect(tone("connecting")).toBe("connecting");
+      expect(label("error")).toBe("Retrying…");
+      expect(tone("error")).toBe("error");
+      expect(label("no-access")).toBe("No access");
+      expect(tone("no-access")).toBe("no-access");
+      expect(label("offline")).toBe("Offline");
+      expect(label("offline", false)).toBe("Local only");
+      expect(tone("offline")).toBe("offline");
+      // No channel status known: not Synced.
+      expect(label(undefined)).toBe("Offline");
+      expect(tone(undefined)).toBe("offline");
+    }
+    // A live run still reports its counter, whatever the channel says.
+    expect(
+      syncBadgeLabel({
+        status: "synced",
+        now,
+        noteOpen: false,
+        vaultStatus: "connecting",
+        progress: run({ phase: "downloading", done: 3, total: 9 }),
+      }),
+    ).toBe("Syncing 3/9 updates");
   });
 
   it("floors the bar's percentage and clamps it", () => {
@@ -347,7 +392,12 @@ describe("a stopped run with refusals or a failing pull", () => {
       expect(syncBadgeLabel({ status: "synced", now, progress, lastSyncedAt: now })).toBe("Synced · just now");
       expect(syncBadgeLabel({ status: "synced", now, progress })).not.toBe("Sync incomplete");
       expect(syncBadgeTone({ status: "synced", progress })).toBe("synced");
-      expect(syncBadgeLabel({ status: "offline", now, noteOpen: false, progress })).toBe("Synced");
+      expect(
+        syncBadgeLabel({ status: "offline", now, noteOpen: false, vaultStatus: "synced", progress }),
+      ).toBe("Synced");
+      expect(
+        syncBadgeLabel({ status: "offline", now, noteOpen: false, vaultStatus: "error", progress }),
+      ).toBe("Retrying…");
     }
   });
 
