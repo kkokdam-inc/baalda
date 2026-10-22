@@ -8,10 +8,10 @@ import type pg from "pg";
  *
  * Deliberately tiny: no dependency, no Postgres writes, no scheduled query.
  * Counters are process-local and reset on restart; a second instance keeps
- * its own. Every 60 s, and only when something changed since the last flush,
- * one structured line goes to the log:
+ * its own. Every 60 s when something changed since the last flush (else every
+ * 5 min), one structured line goes to the log, with process memory in MB:
  *
- *   [sync-metrics] {"windowS":60,"counters":{"seed.applied":12,...}}
+ *   [sync-metrics] {"windowS":60,"counters":{"seed.applied":12,...},"memMb":{"rss":310.2,...}}
  *
  * The flushed values are the DELTA since the previous flush, so a log search
  * can sum them across lines and instances. `snapshot()` returns the running
@@ -79,15 +79,38 @@ export function takeDelta(): Record<string, number> | null {
   return changed ? delta : null;
 }
 
-/** Emit the one-line summary if anything changed. Exported for tests and shutdown. */
+/** A quiet process still logs its memory this often (counters unchanged). */
+export const SYNC_METRICS_IDLE_EMIT_MS = 5 * 60_000;
+let lastEmitAt = Date.now();
+
+const MB = 1024 * 1024;
+/** Process memory in MB (one decimal), for the summary line. */
+export function memoryMb(): Record<string, number> {
+  const m = process.memoryUsage();
+  const r = (n: number) => Math.round((n / MB) * 10) / 10;
+  return {
+    rss: r(m.rss),
+    heapUsed: r(m.heapUsed),
+    heapTotal: r(m.heapTotal),
+    external: r(m.external),
+    arrayBuffers: r(m.arrayBuffers),
+  };
+}
+
+/**
+ * Emit the one-line summary when anything changed, or every
+ * {@link SYNC_METRICS_IDLE_EMIT_MS} with only memory. Exported for tests and
+ * shutdown.
+ */
 export function flushSyncMetrics(now = Date.now()): string | null {
   const delta = takeDelta();
   const windowS = Math.max(0, Math.round((now - lastFlushAt) / 1000));
   lastFlushAt = now;
-  if (!delta) return null;
+  if (!delta && now - lastEmitAt < SYNC_METRICS_IDLE_EMIT_MS) return null;
+  lastEmitAt = now;
   const sorted: Record<string, number> = {};
-  for (const k of Object.keys(delta).sort()) sorted[k] = delta[k];
-  const line = `[sync-metrics] ${JSON.stringify({ windowS, counters: sorted })}`;
+  if (delta) for (const k of Object.keys(delta).sort()) sorted[k] = delta[k];
+  const line = `[sync-metrics] ${JSON.stringify({ windowS, counters: sorted, memMb: memoryMb() })}`;
   console.info(line);
   return line;
 }
@@ -112,6 +135,7 @@ export function resetSyncMetrics(): void {
   if (timer) clearInterval(timer);
   timer = null;
   lastFlushAt = Date.now();
+  lastEmitAt = lastFlushAt;
 }
 
 /** Upper bound on the gauge below, so one probe stays cheap on a huge vault. */
