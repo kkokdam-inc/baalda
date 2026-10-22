@@ -143,11 +143,21 @@ export type DocEditedHook = (
  */
 export function noteSizeRefusal(
   updateBytes: number,
-  docText: string,
+  docText: string | Y.Text,
   capBytes: number = config.maxNoteMb * 1024 * 1024,
 ): string | null {
   if (updateBytes > capBytes) {
     return `Rejecting oversized sync message: ${updateBytes} bytes (cap ${capBytes})`;
+  }
+  // A `Y.Text` is measured lazily. Every UTF-16 code unit encodes to at most 3
+  // UTF-8 bytes (a surrogate pair is 2 units → 4 bytes; a lone surrogate
+  // becomes U+FFFD, 3 bytes), so a doc whose `length * 3` fits under the cap
+  // cannot exceed it and is admitted without building its string — this runs on
+  // EVERY incoming message. Only a doc that might be over is stringified and
+  // measured exactly, so the limit itself is unchanged.
+  if (typeof docText !== "string") {
+    if (docText.length * 3 <= capBytes) return null;
+    docText = docText.toString();
   }
   const docBytes = Buffer.byteLength(docText, "utf8");
   if (docBytes > capBytes) {
@@ -189,7 +199,7 @@ export function createSyncServer(
     async beforeHandleMessage(data) {
       const refusal = noteSizeRefusal(
         data.update.byteLength,
-        data.document.getText("content").toString(),
+        data.document.getText("content"),
       );
       if (refusal) {
         console.error(`${refusal} for ${data.documentName}`);

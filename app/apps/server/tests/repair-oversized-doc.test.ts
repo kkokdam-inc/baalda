@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 import { createApp } from "../src/http/app.js";
 import { config } from "../src/config.js";
@@ -88,6 +88,40 @@ describe("oversized-doc repair", () => {
       expect(cjk.length).toBeLessThan(CAP);
       expect(Buffer.byteLength(cjk, "utf8")).toBeGreaterThan(CAP);
       expect(noteSizeRefusal(10, cjk, CAP)).toMatch(/oversized doc/);
+    });
+
+    describe("given the live Y.Text (the per-message path)", () => {
+      const ytext = (s: string): Y.Text => {
+        const t = new Y.Doc().getText("content");
+        t.insert(0, s);
+        return t;
+      };
+
+      it("answers exactly as the string form at, under and over the cap", () => {
+        for (const s of [
+          "",
+          "x".repeat(400),
+          "x".repeat(CAP),
+          "x".repeat(CAP + 1),
+          "漢".repeat(333),
+          "漢".repeat(334),
+          "😀".repeat(250),
+          "😀".repeat(251),
+        ]) {
+          expect(noteSizeRefusal(10, ytext(s), CAP)).toEqual(noteSizeRefusal(10, s, CAP));
+        }
+      });
+
+      it("refuses a CJK doc over the cap in bytes though under it in units", () => {
+        expect(noteSizeRefusal(10, ytext("漢".repeat(400)), CAP)).toMatch(/oversized doc/);
+      });
+
+      it("never stringifies a doc that provably fits", () => {
+        const t = ytext("x".repeat(100));
+        const spy = vi.spyOn(t, "toString");
+        expect(noteSizeRefusal(10, t, CAP)).toBeNull();
+        expect(spy).not.toHaveBeenCalled();
+      });
     });
   });
 
