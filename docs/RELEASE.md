@@ -600,13 +600,14 @@ on disk.
 
 ## Windows code signing (optional)
 
-> Not currently built — `windows-latest` is commented out of the release matrix.
-> This section applies whenever it is re-enabled.
+> Windows x64 is built on `windows-latest` in the release matrix and ships
+> **unsigned** (see the platform table above). Signing is optional future work.
 
 Unsigned Windows installers still run but show a SmartScreen
-*"Windows protected your PC"* warning. To remove it, obtain an OV/EV code-signing
-certificate and add Tauri's Windows signing config; this is optional and can be
-deferred.
+*"Windows protected your PC"* warning on a fresh download (auto-update is
+unaffected: the updater checks our minisign signature). To remove the warning,
+obtain an OV/EV code-signing certificate and add Tauri's Windows signing config;
+this is optional and can be deferred.
 
 ## Linux
 
