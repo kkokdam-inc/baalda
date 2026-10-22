@@ -4782,6 +4782,12 @@ export class SyncManager implements InboundHost {
         keep.add(docId);
         continue;
       }
+      // A server-only note whose placeholder is deferred until its bootstrap
+      // page lands is not on disk yet, and the server holds nothing for it:
+      // there is nothing here to push. Probing it only read a missing file
+      // (one Rust ERROR line per doc, thousands on a shared-vault join).
+      // Neither kept nor settled: the next connect asks again once it exists.
+      if (this.registry.deferredPathFor?.(docId)) continue;
       toProbe.push({ docId, relPath });
     }
     if (toProbe.length === 0) return keep;
@@ -4887,6 +4893,13 @@ export class SyncManager implements InboundHost {
     } catch {
       // No stat (older Rust core, a racing delete, a fake in a test): fall
       // through to the read, which answers the same question the slow way.
+      // A file that is simply not there answers "not empty" (the verdict a
+      // failed read gave) without the read, which Rust logs as an ERROR.
+      try {
+        if (!(await ipc.noteExists(relPath, scope.vaultEpoch))) return false;
+      } catch {
+        /* no answer: the read decides, as before */
+      }
     }
     if (!scope.isCurrent()) return false;
     return this.registry.isNoteEmptyOnDisk(relPath);

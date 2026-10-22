@@ -56,6 +56,7 @@ const fakeRegistry = vi.hoisted(() => {
     flushCheckpoint: vi.fn(async () => {}),
     materializePendingFromBootstrap: vi.fn(async () => false),
     pendingFromBootstrapCount: vi.fn(() => 0),
+    deferredPathFor: vi.fn((_docId: string): string | null => null),
     failures: vi.fn((): unknown[] => []),
     hasFailures: vi.fn(() => false),
     heldRefusals: vi.fn((): unknown[] => []),
@@ -436,5 +437,40 @@ describe("a note created empty", () => {
     fakeRegistry.isNoteEmptyOnDisk.mockClear();
     await ready(sm, [DOC]);
     expect(fakeRegistry.isNoteEmptyOnDisk).toHaveBeenCalledWith(REL);
+  });
+});
+
+// `ready.empty` on a shared-vault join names server-only notes whose placeholder
+// is deferred until the bootstrap delivers them, so nothing is on disk yet.
+// Probing them read a missing file per doc, and Rust logs every failed read as
+// an ERROR: thousands of "Couldn't read the note" lines per join.
+describe("ready.empty for a note that is not on disk yet", () => {
+  it("does not probe a doc whose placeholder is still deferred, and does not queue it", async () => {
+    fakeRegistry.deferredPathFor.mockImplementation((docId: string) => (docId === DOC ? REL : null));
+    fakeDisk.files.delete(REL);
+    try {
+      const sm = manager();
+      await enable(sm);
+      vi.mocked(ipc.noteExists).mockClear();
+      await ready(sm, [DOC]);
+      expect(fakeRegistry.isNoteEmptyOnDisk).not.toHaveBeenCalled();
+      expect(ipc.noteExists).not.toHaveBeenCalled();
+      expect(connects.order).toEqual([]);
+      expect(fakeRegistry.markPushed).not.toHaveBeenCalledWith(DOC);
+    } finally {
+      fakeRegistry.deferredPathFor.mockImplementation(() => null);
+    }
+  });
+
+  it("never reads a mapped file that is missing from disk", async () => {
+    fakeDisk.files.delete(REL);
+    fakeRegistry.emptyOnDisk = new Set();
+    const sm = manager();
+    await enable(sm);
+    await ready(sm, [DOC]);
+    expect(ipc.noteExists).toHaveBeenCalledWith(REL, 1);
+    expect(fakeRegistry.isNoteEmptyOnDisk).not.toHaveBeenCalled();
+    // Same verdict a failed read gave: not settled as empty everywhere.
+    expect(fakeRegistry.markPushed).not.toHaveBeenCalledWith(DOC);
   });
 });
