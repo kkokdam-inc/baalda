@@ -336,7 +336,7 @@ export const TOOLS: McpTool[] = [
     name: "list_notes",
     annotations: { title: "List notes", ...READ },
     description:
-      "List notes you can access in a vault (optionally within one folder or under a path prefix). Returns each note's docId, title, path and your permission. Without `limit`/`cursor` every note comes back at once; for large vaults pass `limit` and then each `nextCursor` until it is null.",
+      "List notes you can access in a vault (optionally within one folder or under a path prefix). Returns each note's docId, title, path and your permission. Prefer `limit` (e.g. 200) and then each `nextCursor` until it is null: a paged call is cheap, while listing the whole vault at once (no `limit`/`cursor`) is slow on large vaults and counts 20x against this connection's rate limit.",
     inputSchema: {
       type: "object",
       properties: {

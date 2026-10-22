@@ -91,5 +91,5 @@ export async function resolveOAuthMcpAuth(
 
   if (!(await orgRole(organizationId, session.userId, db))) return null;
 
-  return { userId: session.userId, organizationId };
+  return { userId: session.userId, organizationId, oauthClientId: session.clientId };
 }
