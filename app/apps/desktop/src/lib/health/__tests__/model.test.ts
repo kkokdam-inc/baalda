@@ -249,8 +249,8 @@ describe("content failures", () => {
     docId: "doc-hist",
     relPath: "Hist.md",
     reason:
-      "too large to sync (17.2 MB of edit history; the limit is 10 MB) — " +
-      "reset this note's history to sync it again",
+      "too large to sync (17.2 MB of edit history; the limit is 10 MB). " +
+      "Reset this note's history to sync it again",
     permanent: true,
     kind: "too-large" as const,
   };
@@ -506,7 +506,7 @@ describe("registry failures", () => {
               path: "Gone.md",
               docId: "d7",
               reason:
-                "deleted on the server, but this device never confirmed its content — left on disk",
+                "deleted on the server, but this device never confirmed its content, so it was left on disk",
               code: null,
             },
           ],

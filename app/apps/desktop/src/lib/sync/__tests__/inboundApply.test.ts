@@ -1879,7 +1879,7 @@ describe("a revoked tree binary leaves the disk like a revoked note", () => {
       [
         "orphan",
         "Team/report.pdf",
-        "access was removed, but this device never confirmed its bytes upstream — left on disk",
+        "access was removed, but this device never confirmed its bytes upstream, so it was left on disk",
       ],
     ]);
   });

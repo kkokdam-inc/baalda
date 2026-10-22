@@ -235,7 +235,7 @@ export function createDocWriter(
   const requireUnderCap = (resulting: number): void => {
     if (resulting > capChars()) {
       throw new NoteTooLargeError(
-        `note would exceed the ${config.maxNoteMb} MB size ceiling — split the content across smaller notes`,
+        `note would exceed the ${config.maxNoteMb} MB size ceiling. Split the content across smaller notes`,
       );
     }
   };

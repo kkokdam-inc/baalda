@@ -83,7 +83,7 @@ export function DocxView({ path, abs }: ViewerProps) {
         const hardCap = maxBytesFor("docx");
         if (stat.size > hardCap) {
           setError(
-            `This document is ${formatBytes(stat.size)} — over the ${formatBytes(hardCap)} limit.`,
+            `This document is ${formatBytes(stat.size)}, over the ${formatBytes(hardCap)} limit.`,
           );
           return;
         }

@@ -97,7 +97,7 @@ export function XlsxView({ path, abs }: ViewerProps) {
         const hardCap = maxBytesFor("xlsx");
         if (stat.size > hardCap) {
           setError(
-            `This workbook is ${formatBytes(stat.size)} — over the ${formatBytes(hardCap)} limit.`,
+            `This workbook is ${formatBytes(stat.size)}, over the ${formatBytes(hardCap)} limit.`,
           );
           return;
         }

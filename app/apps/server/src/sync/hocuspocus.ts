@@ -161,7 +161,7 @@ export function noteSizeRefusal(
   }
   const docBytes = Buffer.byteLength(docText, "utf8");
   if (docBytes > capBytes) {
-    return `Refusing writes to oversized doc: ${docBytes} bytes (cap ${capBytes}) — needs /reset-crdt`;
+    return `Refusing writes to oversized doc: ${docBytes} bytes (cap ${capBytes}); needs /reset-crdt`;
   }
   return null;
 }

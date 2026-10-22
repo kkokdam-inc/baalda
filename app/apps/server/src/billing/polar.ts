@@ -160,7 +160,7 @@ async function polarCall<T>(op: string, fn: () => Promise<T>): Promise<T> {
       throw new Error(
         code
           ? `Polar ${op} refused: ${code} (HTTP ${e.statusCode ?? "?"})`
-          : `Polar ${op} returned a response this SDK could not parse (HTTP ${e.statusCode ?? "?"}) — see server logs`,
+          : `Polar ${op} returned a response this SDK could not parse (HTTP ${e.statusCode ?? "?"}). See server logs`,
       );
     }
     throw err;

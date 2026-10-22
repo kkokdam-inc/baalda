@@ -172,7 +172,7 @@ export function DashboardAgentRunner({ path, expectedEpoch, launchTarget, showLa
     }
   };
 
-  const launchButtons = (["claude", "codex"] as const).filter((agent) => path || (agent === selectedAgent && sessionPath)).map((agent) => <button key={agent} type="button" data-agent={agent} className={`ghost-pill sm dashboard-agent-launch${agent === selectedAgent && phase !== "idle" ? ` agent-launch-${phase}` : ""}`} aria-label={`Update with ${agent === "claude" ? "Claude" : "Codex"}${agent === selectedAgent && phase !== "idle" ? ` — ${phase === "success" ? "completed" : phase === "error" ? "failed" : phase}` : ""}`} title={agent === selectedAgent && sessionPath ? `${agent === "claude" ? "Claude" : "Codex"} · ${sessionPath}${phase !== "idle" ? ` · ${phase}` : ""}` : `Update with ${agent === "claude" ? "Claude" : "Codex"}`}
+  const launchButtons = (["claude", "codex"] as const).filter((agent) => path || (agent === selectedAgent && sessionPath)).map((agent) => <button key={agent} type="button" data-agent={agent} className={`ghost-pill sm dashboard-agent-launch${agent === selectedAgent && phase !== "idle" ? ` agent-launch-${phase}` : ""}`} aria-label={`Update with ${agent === "claude" ? "Claude" : "Codex"}${agent === selectedAgent && phase !== "idle" ? `: ${phase === "success" ? "completed" : phase === "error" ? "failed" : phase}` : ""}`} title={agent === selectedAgent && sessionPath ? `${agent === "claude" ? "Claude" : "Codex"} · ${sessionPath}${phase !== "idle" ? ` · ${phase}` : ""}` : `Update with ${agent === "claude" ? "Claude" : "Codex"}`}
       disabled={running && agent !== selectedAgent}
       onClick={(event) => {
         onOpen?.();

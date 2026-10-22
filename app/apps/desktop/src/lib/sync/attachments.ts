@@ -2427,7 +2427,7 @@ export class AttachmentSync {
     // `overwrite` is the three-way's replacement (`replaceOne`), which decided
     // the server's version wins and kept any copy it needed first.
     if (!opts.overwrite && this.localPathKeys.has(pathKey(relPath))) {
-      throw new Error(`${relPath} is occupied on disk — refusing to overwrite it with a download`);
+      throw new Error(`${relPath} is occupied on disk, so a download will not overwrite it`);
     }
     const tree = !isUnderAttachments(relPath);
     // A tree binary needs a host that can write outside `attachments/`. Without

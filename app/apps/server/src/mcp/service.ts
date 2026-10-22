@@ -331,7 +331,7 @@ async function assertRootNotFrozen(
   );
   if (rows[0]?.root_frozen) {
     throw new McpToolError(
-      `This vault's root is frozen — ${action} this inside a folder instead.`,
+      `This vault's root is frozen. ${action === "move" ? "Move" : "Create"} this inside a folder instead.`,
     );
   }
 }
@@ -439,7 +439,7 @@ export async function deleteFolder(
     );
     if (!(await folderIsEmpty(pool, folderId)) || (files[0]?.n ?? 0) > 0) {
       throw new McpToolError(
-        "Folder is not empty — move its contents first, or pass recursive: true to delete them with it",
+        "Folder is not empty. Move its contents first, or pass recursive: true to delete them with it",
       );
     }
   }
@@ -1165,14 +1165,14 @@ export function planEdits(current: string, edits: NoteEdit[]): TextOp[] {
     const all = (edit.type === "replace" || edit.type === "delete") && edit.all === true;
     if (spans.length === 0) {
       throw new EditError(
-        `edit ${n + 1} (${edit.type}): anchor not found — the note may have changed; read it again.` +
+        `edit ${n + 1} (${edit.type}): anchor not found. The note may have changed; read it again.` +
           notFoundHint(text, anchor),
         "anchor_not_found",
       );
     }
     if (spans.length > 1 && !all) {
       throw new EditError(
-        `edit ${n + 1} (${edit.type}): anchor matches ${spans.length} times — include more surrounding text to make it unique` +
+        `edit ${n + 1} (${edit.type}): anchor matches ${spans.length} times. Include more surrounding text to make it unique` +
           (edit.type === "replace" || edit.type === "delete" ? ", or set all: true" : ""),
         "anchor_ambiguous",
       );

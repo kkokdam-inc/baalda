@@ -299,7 +299,7 @@ function tooLargeIssue(f: HealthContentFailure, ctx: IssueContext): HealthIssue 
   const fixes =
     cause === "history"
       ? [
-          "Reset this note's history — it clears the stored edit history and keeps " +
+          "Reset this note's history. It clears the stored edit history and keeps " +
             "the note's text exactly as it is. This is the fix in almost every case.",
           "If it comes back, something is rewriting this note repeatedly (an " +
             "automation or a script). Stop that first, then reset again.",
@@ -342,7 +342,7 @@ function tooLargeIssue(f: HealthContentFailure, ctx: IssueContext): HealthIssue 
     code: null,
     explanation: {
       meaning,
-      next: "Nothing — Baalda will not retry until the note is smaller.",
+      next: "Nothing. Baalda will not retry until the note is smaller.",
       fixes,
       safety: "only-here",
     },
@@ -394,7 +394,7 @@ export function classifyUploadReason(reason: string): string | null {
   }
   if (r === "deleted" || r.includes("404") || r.includes("not found")) {
     return (
-      "The Remote Vault has no record for this note any more — it was deleted there while " +
+      "The Remote Vault has no record for this note any more. It was deleted there while " +
       "this device still held it. Your copy is untouched on disk."
     );
   }
@@ -583,11 +583,11 @@ function limitIssue(f: HealthRegistryFailure): HealthIssue {
       meaning: notes ? "This vault reached its sync limit for notes. Your additional notes remain safely on this device." : member
         ? "The free plan allows a limited number of people in one vault. This vault " +
           "is at that number, so the Remote Vault turned this request down. Nothing was " +
-          "lost — the work simply stopped at the gate."
+          "lost. The work simply stopped at the gate."
         : "The free plan allows a limited number of vaults per account. This account " +
           "is at that number, so the Remote Vault would not create another one. Nothing " +
-          "was lost — the work simply stopped at the gate.",
-      next: "Nothing — the Remote Vault will refuse this the same way every time until the limit lifts.",
+          "was lost. The work simply stopped at the gate.",
+      next: "Nothing. The Remote Vault will refuse this the same way every time until the limit lifts.",
       fixes: [
         notes ? "Upgrade this vault to Team to sync more notes." : member
           ? "Upgrade this vault to add more people."
@@ -768,7 +768,7 @@ function registryIssue(f: HealthRegistryFailure, ctx: IssueContext): HealthIssue
       path: f.path,
       kind: "left-behind",
       severity: "error",
-      title: "Left on disk — not on the Remote Vault",
+      title: "Left on disk, not on the Remote Vault",
       why:
         `${capitalize(f.reason)} It was kept here rather than removed, because ` +
         `this device may hold the only copy. Open it to check, then delete it if ` +
@@ -779,7 +779,7 @@ function registryIssue(f: HealthRegistryFailure, ctx: IssueContext): HealthIssue
         meaning:
           "The Remote Vault no longer has this note. Either someone deleted it, or your " +
           "access to it was withdrawn. Normally Baalda would remove the file here " +
-          "to match — but this device never got confirmation that the Remote Vault had " +
+          "to match, but this device never got confirmation that the Remote Vault had " +
           "this note's content, so the copy in front of you may be the only one " +
           "that exists. It was kept on purpose rather than deleted.",
         next: "Nothing. Baalda will not remove it and will not re-upload it on its own.",
@@ -823,8 +823,8 @@ function registryIssue(f: HealthRegistryFailure, ctx: IssueContext): HealthIssue
     explanation: {
       meaning:
         `Before anything can sync, the Remote Vault needs a record that this ${what} ` +
-        `exists. That record could not be created, so this ${what} — and, for a ` +
-        `folder, everything inside it — stays on this device only. ` +
+        `exists. That record could not be created, so this ${what} (and, for a ` +
+        `folder, everything inside it) stays on this device only. ` +
         (coded ??
           (f.code
             ? `The Remote Vault answered with "${f.code}".`
@@ -844,7 +844,7 @@ function registryIssue(f: HealthRegistryFailure, ctx: IssueContext): HealthIssue
             : f.code === "path_folder_mismatch"
               ? [
                   `Move the ${what} somewhere else and back, which re-states where it lives.`,
-                  "If it persists, report it with Copy details — the two Remote Vault records need reconciling.",
+                  "If it persists, report it with Copy details. The two Remote Vault records need reconciling.",
                 ]
               : [
                   "Retry now.",
@@ -896,10 +896,10 @@ export function createRefusalIssue(g: CreateRefusalGroup, ctx: IssueContext): He
       meaning: access
         ? `Before a new note can sync, the Remote Vault has to accept it. You can read ${
             g.folder === "" ? "this vault" : "this folder"
-          } but not add to it, so the Remote Vault turned these down. Nothing was lost — ` +
-          "the files are safe on this computer."
+          } but not add to it, so the Remote Vault turned these down. Nothing was lost. ` +
+          "The files are safe on this computer."
         : "This vault's top level is locked, so new notes can only be added inside a folder. " +
-          "Nothing was lost — the files are safe on this computer.",
+          "Nothing was lost. The files are safe on this computer.",
       next: access
         ? "They sync by themselves as soon as your access changes. Baalda also checks again every 10 minutes."
         : "They sync by themselves once they are inside a folder.",
@@ -1217,10 +1217,10 @@ function buildIssues(
             "The Remote Vault does not know this note yet. That is normal for a note " +
             "created while you were offline, one added to the folder from outside " +
             "Baalda a moment ago, or one whose registration is still queued behind " +
-            "others. Nothing has failed — it simply has not had its turn.",
+            "others. Nothing has failed. It simply has not had its turn.",
           next: "Registers on the next sync pass, then its content uploads straight after.",
           fixes: [
-            "Wait — this usually clears itself within a few seconds of being connected.",
+            "Wait. This usually clears itself within a few seconds of being connected.",
             "Retry now if it has been sitting here.",
             "If it never clears, Copy details from any other note on this page and report it.",
           ],
@@ -1270,7 +1270,7 @@ export function linkIssues(checks: VaultChecks | null | undefined): HealthIssue[
         meaning:
           "A symbolic link points at another file or folder. Baalda syncs the real file " +
           "or folder, never the link, so anything reached only through a link stays on this device.",
-        next: "Nothing — links are always skipped.",
+        next: "Nothing. Links are always skipped.",
         fixes: [
           "Move the real file or folder into the vault where you want it, instead of linking to it.",
           "Or delete the link if the real one is already in the vault.",
@@ -1303,7 +1303,7 @@ export function linkIssues(checks: VaultChecks | null | undefined): HealthIssue[
         meaning:
           "Each of these paths is its own note in Baalda, but they are one file on this computer. " +
           "Edits made through one can overwrite the other.",
-        next: "Nothing — Baalda will not pick which note is the real one.",
+        next: "Nothing. Baalda will not pick which note is the real one.",
         fixes: [
           "Remove the symbolic link, so only the real path is left.",
           "If a copy of the note comes back at the linked path afterwards, delete that copy.",
@@ -1494,7 +1494,7 @@ function describe(
       };
     case "signed-out":
       return {
-        headline: "Signed out — nothing is syncing",
+        headline: "Signed out. Nothing is syncing",
         detail:
           `This vault syncs with${serverHost ? ` ${serverHost}` : " its Remote Vault"}. ` +
           `Sign in to resume. Your edits are safe on disk in the meantime.`,
@@ -1508,7 +1508,7 @@ function describe(
       };
     case "offline":
       return {
-        headline: `Offline — ${num(counts.synced)} of ${plural(counts.total, "note")} are on the Remote Vault`,
+        headline: `Offline: ${num(counts.synced)} of ${plural(counts.total, "note")} are on the Remote Vault`,
         detail: `${last}. Syncing resumes on its own when the connection comes back.${where}`,
       };
     case "connecting":
@@ -1519,7 +1519,7 @@ function describe(
     case "syncing": {
       const p = input.syncProgress;
       if (p?.phase === "removing") return {
-        headline: `Updating access — ${num(Math.max(0, p.total - p.done))} remaining`,
+        headline: `Updating access: ${num(Math.max(0, p.total - p.done))} remaining`,
         detail: "Removing local copies you can no longer access.",
       };
       // #258: content the server has never had (an interrupted first upload
@@ -1527,14 +1527,14 @@ function describe(
       // until this reaches zero" is the one thing the reader needs to know.
       const notUploaded = p?.notUploaded ?? 0;
       if (notUploaded > 0) return {
-        headline: `Uploading — ${plural(notUploaded, "note")} not uploaded yet`,
+        headline: `Uploading: ${plural(notUploaded, "note")} not uploaded yet`,
         detail:
           `Teammates see these notes as empty until their content arrives. Keep ` +
           `${BRAND_NAME} open until this reaches zero${where}.${overflow}`,
       };
       const of = p && p.total > 0 ? `${num(p.done)} of ${num(p.total)}` : num(behind);
       return {
-        headline: `Syncing — ${of} updates`,
+        headline: `Syncing: ${of} updates`,
         detail:
           `${num(counts.synced)} of ${plural(counts.total, "note")} are confirmed so far` +
           `${where}.${overflow}`,
@@ -1546,7 +1546,7 @@ function describe(
           behind === 0
             ? `${plural(errors, "thing")} need${errors === 1 ? "s" : ""} you`
             : errors > 0
-              ? `${plural(behind, "note")} not on the Remote Vault — ${num(errors)} need you`
+              ? `${plural(behind, "note")} not on the Remote Vault, ${num(errors)} need you`
               : `${plural(behind, "note")} ${behind === 1 ? "is" : "are"} not on the Remote Vault`,
         detail: `${last}${where}.${overflow}`,
       };
@@ -1570,13 +1570,13 @@ function describe(
 export function safetyLabel(safety: HealthExplanation["safety"]): string {
   switch (safety) {
     case "only-here":
-      return "On this device only — the Remote Vault has no confirmed copy of it.";
+      return "On this device only. The Remote Vault has no confirmed copy of it.";
     case "on-server":
       return "On the Remote Vault. What failed was writing it onto this device.";
     case "both":
       return "On this device and on the Remote Vault.";
     case "unknown":
-      return "Not known — Baalda cannot confirm right now where a copy exists.";
+      return "Not known. Baalda cannot confirm right now where a copy exists.";
   }
 }
 
@@ -1613,18 +1613,18 @@ export interface InspectVerdictInput {
 export function composeInspectionVerdict(i: InspectVerdictInput): string {
   if (!i.exists) return "There is no file at this path.";
   if (!i.syncEnabled) return "This folder does not sync, so this note lives on this device only.";
-  if (i.issue) return `${i.issue.title} — see Needs attention above for what to do.`;
+  if (i.issue) return `${i.issue.title}. See Needs attention above for what to do.`;
   if (i.permanentFailure) {
     return `Baalda stopped trying to sync this note: ${capitalize(i.permanentFailure)}`;
   }
-  if (i.queued) return "Waiting to be pushed — it is in the queue for the next sync pass.";
+  if (i.queued) return "Waiting to be pushed. It is in the queue for the next sync pass.";
   if (i.diverged) return "Has edits the Remote Vault may not have yet; the next sync pass will send them.";
   if (i.state === "synced" && i.pushed) {
-    return "Synced — the Remote Vault confirmed this note's content.";
+    return "Synced. The Remote Vault confirmed this note's content.";
   }
   if (i.pushed && i.state === null) {
     return "On the Remote Vault; nothing about it has changed since this app launched.";
   }
   if (i.docId === null) return "The Remote Vault does not know this note yet.";
-  return "Not confirmed yet — nothing has reported this note's content as stored on the Remote Vault.";
+  return "Not confirmed yet. Nothing has reported this note's content as stored on the Remote Vault.";
 }

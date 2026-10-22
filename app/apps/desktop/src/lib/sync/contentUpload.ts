@@ -519,7 +519,7 @@ export class ContentUploader {
         docId,
         relPath,
         `too large to sync (${mb} MB of edit history; the limit is ${cap} MB). ` +
-          `reset this note's history to sync it again`,
+          `Reset this note's history to sync it again`,
         { permanent: true, kind: "too-large" },
       );
       return false;

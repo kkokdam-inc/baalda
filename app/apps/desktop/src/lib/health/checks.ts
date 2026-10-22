@@ -75,7 +75,7 @@ export const CHECK_ACTIONS: Record<CheckAction, CheckActionWording> = {
     confirm: {
       title: "Delete {n} {check}?",
       body:
-        "They are removed from this vault and from every device that syncs it — the " +
+        "They are removed from this vault and from every device that syncs it. It is the " +
         "same delete the sidebar makes. A vault checkpoint can bring them back.",
       confirmLabel: "Delete all",
       tone: "danger",
@@ -109,7 +109,7 @@ export const CHECK_ACTIONS: Record<CheckAction, CheckActionWording> = {
       body:
         "Each offending character becomes `-`, a trailing dot or space is dropped, and " +
         "a name Windows reserves gets a leading `_`. The file keeps its identity, its " +
-        "history and its place, so this is a rename and not a new note — but a " +
+        "history and its place, so this is a rename and not a new note, but a " +
         "[[wikilink]] that used the old name will need updating. Folders are left alone.",
       confirmLabel: "Rename them",
       tone: "accent",
@@ -193,8 +193,8 @@ export const CHECK_DEFINITIONS: CheckDefinition[] = [
       "An empty note syncs fine, but a note that used to have text and is now empty " +
       "usually means a save that never landed or a file another app truncated.",
     howToFix: [
-      "Open the note — if it should have content, restore it from Versioning.",
-      "Delete notes you never filled in — Delete all clears every one listed here at once.",
+      "Open the note. If it should have content, restore it from Versioning.",
+      "Delete notes you never filled in. Delete all clears every one listed here at once.",
     ],
     severity: "info",
     itemActions: ["open", "reveal", "delete"],
@@ -225,7 +225,7 @@ export const CHECK_DEFINITIONS: CheckDefinition[] = [
       "A note that starts with --- but the properties block never closes, or holds lines that are not key: value.",
     whyItMatters:
       "Properties Baalda cannot read are shown as plain text and never touched, so nothing is " +
-      "lost — but tags and dates in that block will not be found by search or filters.",
+      "lost, but tags and dates in that block will not be found by search or filters.",
     howToFix: [
       "Open the note and close the block with a line containing only ---.",
       "Keep one property per line as key: value.",
@@ -245,7 +245,7 @@ export const CHECK_DEFINITIONS: CheckDefinition[] = [
       "are almost always pasted images or data tables.",
     howToFix: [
       "Move big images and files into attachments and link to them.",
-      "Split the note, or save a copy outside the vault and shorten it — Save copies puts " +
+      "Split the note, or save a copy outside the vault and shorten it. Save copies puts " +
         "all of them in one folder in a single step.",
     ],
     severity: "error",
@@ -262,7 +262,7 @@ export const CHECK_DEFINITIONS: CheckDefinition[] = [
       "Search, tags, backlinks and the graph read the index, so a stale row means results " +
       "that miss recent edits or point at a file that no longer exists.",
     howToFix: [
-      "Heal rebuilds the index — it reads every note again and takes a few seconds.",
+      "Heal rebuilds the index. It reads every note again and takes a few seconds.",
     ],
     severity: "warn",
     itemActions: ["open", "reveal"],
@@ -274,7 +274,7 @@ export const CHECK_DEFINITIONS: CheckDefinition[] = [
     label: "Markdown not picked up",
     looksFor: "Markdown files on disk that have no entry in the index.",
     whyItMatters:
-      "A file the index never saw is invisible to search and is not synced — usually one " +
+      "A file the index never saw is invisible to search and is not synced. Usually it is one " +
       "that was copied in while Baalda was not running.",
     howToFix: [
       "Heal rebuilds the index so these files become notes.",
@@ -315,7 +315,7 @@ export const CHECK_DEFINITIONS: CheckDefinition[] = [
       "Heal renames every FILE listed here to the same name without the offending " +
         "character (it becomes `-`, a trailing dot or space is dropped, and a reserved " +
         "Windows name gets a leading `_`). The note keeps its identity and its history.",
-      "Folders are left to you — renaming one moves everything inside it.",
+      "Folders are left to you, because renaming one moves everything inside it.",
       "A wikilink that used the old name needs updating afterwards.",
     ],
     severity: "warn",
@@ -330,7 +330,7 @@ export const CHECK_DEFINITIONS: CheckDefinition[] = [
     whyItMatters: "Windows and some backup tools refuse paths past 260 characters in total.",
     howToFix: [
       "Shorten the folder or file name.",
-      "Baalda will not shorten it for you — a name truncated by a machine stops " +
+      "Baalda will not shorten it for you. A name truncated by a machine stops " +
         "saying what the note is.",
     ],
     severity: "info",
@@ -393,7 +393,7 @@ export const CHECK_DEFINITIONS: CheckDefinition[] = [
       "History this large slows opening and syncing the note and can push it over the Remote Vault's " +
       "limit even when the text is small.",
     howToFix: [
-      "Reset the note's history — it keeps the text and starts a fresh history on every device.",
+      "Reset the note's history. It keeps the text and starts a fresh history on every device.",
       "Heal does that for every note listed here in one pass.",
     ],
     severity: "warn",

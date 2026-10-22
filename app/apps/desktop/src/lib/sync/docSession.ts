@@ -2886,7 +2886,7 @@ export class SyncManager implements InboundHost {
         path: d.relPath,
         docId: d.docId,
         reason:
-          `${items.length} notes vanished from disk in one window (cap ${cap}) — ` +
+          `${items.length} notes vanished from disk in one window (cap ${cap}), so they were ` +
           `left on the server deliberately`,
         code: null,
       });
