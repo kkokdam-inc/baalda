@@ -297,6 +297,64 @@ describe("effectiveLockForPath", () => {
     // Outside that folder the vault is still the only thing deciding.
     expect(effectiveLockForPath(map, "loose.md")).toBe("vault");
   });
+
+  // Members & Access: Can view on a parent folder, Can edit on one subfolder,
+  // in a Shared vault. Among one person's rows the deepest wins on the server,
+  // so the subfolder must not inherit the parent's "you" padlock.
+  const myViewOnProjects = () =>
+    share({
+      id: "mine",
+      resourceType: "folder",
+      resourceId: "f-projects",
+      principalType: "user",
+      principalId: "u1",
+      permission: "locked",
+    });
+
+  it("lets the caller's own deeper edit row lift their own ancestor lock", () => {
+    const map = lockScopesByPath(tree, [myViewOnProjects()], "u1", [
+      lift("folder", "f-deep", { type: "user", id: "u1" }),
+    ]);
+    expect(effectiveLockForPath(map, "Projects/Deep")).toBeNull();
+    expect(effectiveLockForPath(map, "Projects/Deep/buried.md")).toBeNull();
+    // The rest of the parent folder stays view-only.
+    expect(effectiveLockForPath(map, "Projects")).toBe("you");
+    expect(effectiveLockForPath(map, "Projects/alpha.md")).toBe("you");
+  });
+
+  it("a per-user file edit row lifts just that note out of the caller's folder lock", () => {
+    const map = lockScopesByPath(tree, [myViewOnProjects()], "u1", [
+      lift("file", "n-alpha", { type: "user", id: "u1" }),
+    ]);
+    expect(effectiveLockForPath(map, "Projects/alpha.md")).toBeNull();
+    expect(effectiveLockForPath(map, "Projects/Deep/buried.md")).toBe("you");
+  });
+
+  it("does not let a personal lift override an Everyone lock or another person's grant", () => {
+    const everyone = lockScopesByPath(
+      tree,
+      [share({ resourceType: "folder", resourceId: "f-projects" })],
+      "u1",
+      [lift("folder", "f-deep", { type: "user", id: "u1" })],
+    );
+    expect(effectiveLockForPath(everyone, "Projects/Deep/buried.md")).toBe("all");
+
+    const someoneElse = lockScopesByPath(tree, [myViewOnProjects()], "u1", [
+      lift("folder", "f-deep", { type: "user", id: "u2" }),
+    ]);
+    expect(effectiveLockForPath(someoneElse, "Projects/Deep/buried.md")).toBe("you");
+  });
+
+  it("a deeper own lock under the caller's edit row still applies", () => {
+    const map = lockScopesByPath(
+      tree,
+      [share({ id: "deep", resourceType: "folder", resourceId: "f-deep", principalType: "user", principalId: "u1" })],
+      "u1",
+      [lift("folder", "f-projects", { type: "user", id: "u1" })],
+    );
+    expect(effectiveLockForPath(map, "Projects/Deep/buried.md")).toBe("you");
+    expect(effectiveLockForPath(map, "Projects/alpha.md")).toBeNull();
+  });
 });
 
 describe("billing-lapsed vault lock", () => {
