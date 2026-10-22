@@ -50,11 +50,20 @@ function fail(
   return { jsonrpc: "2.0", id: id ?? null, error: { code, message } };
 }
 
-/** A tool result: text (always) + structuredContent (when the payload is data). */
-function toolResult(data: unknown): Record<string, unknown> {
+/**
+ * A tool result: text (always) + structuredContent (when the payload is data).
+ *
+ * The spec asks a tool that returns structuredContent to also return the same
+ * JSON serialized in a text block, for clients that only read `content`; both
+ * carry identical data. The text is COMPACT JSON: indentation once made MCP
+ * responses most of the server's egress (scripted clients send no
+ * Accept-Encoding, so nothing compresses them) and adds nothing a JSON parser
+ * reads. `JSON.parse(text)` is unchanged.
+ */
+export function toolResult(data: unknown): Record<string, unknown> {
   const structured = Array.isArray(data) ? { results: data } : data;
   return {
-    content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    content: [{ type: "text", text: JSON.stringify(data) }],
     structuredContent: structured,
   };
 }

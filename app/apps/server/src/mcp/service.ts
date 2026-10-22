@@ -530,59 +530,129 @@ export async function moveNoteTool(
 
 // ── notes (markdown docs) ─────────────────────────────────────────────────────
 
+/** Page size used when `cursor` is given without `limit`. */
+export const LIST_NOTES_DEFAULT_PAGE = 500;
+/** Largest page `list_notes` hands back in one call. */
+export const LIST_NOTES_MAX_PAGE = 5000;
+
+export interface ListedNote {
+  docId: string;
+  folderId: string | null;
+  title: string;
+  relPath: string;
+  permission: Permission;
+  updatedAt: string;
+}
+
+/** Opaque keyset cursor over `(rel_path, id)`, the paged listing's sort order. */
+function encodeNotesCursor(relPath: string, id: string): string {
+  return Buffer.from(JSON.stringify([relPath, id]), "utf8").toString("base64url");
+}
+
+function decodeNotesCursor(cursor: string): [string, string] {
+  try {
+    const v: unknown = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+    if (Array.isArray(v) && v.length === 2 && typeof v[0] === "string" && typeof v[1] === "string") {
+      return [v[0], v[1]];
+    }
+  } catch {
+    // fall through to the refusal
+  }
+  throw new McpToolError("Invalid cursor: pass the nextCursor from a previous list_notes call");
+}
+
+/**
+ * List the notes the caller can read.
+ *
+ * With neither `limit` nor `cursor` this returns EVERY readable note as a bare
+ * array, exactly as before: existing scripts depend on that shape. With either,
+ * it returns one page `{ results, nextCursor }`, keyset-paged on
+ * `(rel_path, id)`. Permission filtering happens before the page is cut, so a
+ * page is short only when it is the last one, and `nextCursor` is null exactly
+ * then. `pathPrefix` keeps notes whose relPath starts with it (case-sensitive).
+ */
 export async function listNotes(
   ctx: McpContext,
   vaultId: string,
   folderId?: string | null,
-) {
+  opts: { limit?: number; cursor?: string; pathPrefix?: string } = {},
+): Promise<ListedNote[] | { results: ListedNote[]; nextCursor: string | null }> {
   await requireVaultInScope(ctx.auth, vaultId);
-  const params: unknown[] = [vaultId];
-  let where = "vault_id = $1 AND deleted_at IS NULL";
-  if (folderId !== undefined && folderId !== null) {
-    params.push(folderId);
-    where += ` AND folder_id = $${params.length}`;
+  const paged = opts.limit !== undefined || opts.cursor !== undefined;
+  let pageSize = Number.POSITIVE_INFINITY;
+  if (paged) {
+    const raw = opts.limit ?? LIST_NOTES_DEFAULT_PAGE;
+    if (!Number.isInteger(raw) || raw < 1) {
+      throw new McpToolError("limit must be a positive integer");
+    }
+    pageSize = Math.min(raw, LIST_NOTES_MAX_PAGE);
   }
-  const { rows } = await pool.query<{
-    id: string;
-    folder_id: string | null;
-    title: string | null;
-    rel_path: string;
-    updated_at: string;
-  }>(
-    `SELECT id, folder_id, title, rel_path, updated_at
-       FROM notes WHERE ${where} ORDER BY rel_path`,
-    params,
-  );
+  let after = opts.cursor !== undefined ? decodeNotesCursor(opts.cursor) : null;
 
   // effectivePermission honours role AND locks, and never returns 'none' for an
   // admin — so this both filters (members see only what's shared) and reports an
   // accurate permission (a locked note shows 'view' even for an owner/admin).
-  const out: Array<{
-    docId: string;
-    folderId: string | null;
-    title: string;
-    relPath: string;
-    permission: Permission;
-    updatedAt: string;
-  }> = [];
-  // One request-scoped cache, prefetched for the whole listing: the same
-  // per-doc resolver, answered from three batch reads instead of ~8 queries
-  // per note (#263). See `permissions/resolver.ts ResolverCache`.
+  const out: ListedNote[] = [];
+  // One request-scoped cache, prefetched per fetched chunk (it merges across
+  // calls): the same per-doc resolver, answered from three batch reads instead
+  // of ~8 queries per note (#263). See `permissions/resolver.ts ResolverCache`.
+  // A paged call only prefetches its own page, not the whole vault.
   const resolverCache = createResolverCache();
-  await resolverCache.prefetch(pool, rows.map((r) => r.id));
-  for (const r of rows) {
-    const permission = await effectivePermission(ctx.auth.userId, r.id, pool, resolverCache);
-    if (permission === "none") continue; // members only see what's shared with them
-    out.push({
-      docId: r.id,
-      folderId: r.folder_id,
-      title: r.title ?? relPathStem(r.rel_path),
-      relPath: r.rel_path,
-      permission,
-      updatedAt: r.updated_at,
-    });
+  for (;;) {
+    const params: unknown[] = [vaultId];
+    let where = "vault_id = $1 AND deleted_at IS NULL";
+    if (folderId !== undefined && folderId !== null) {
+      params.push(folderId);
+      where += ` AND folder_id = $${params.length}`;
+    }
+    if (opts.pathPrefix) {
+      params.push(opts.pathPrefix);
+      where += ` AND left(rel_path, length($${params.length})) = $${params.length}`;
+    }
+    if (after) {
+      params.push(after[0], after[1]);
+      where += ` AND (rel_path, id) > ($${params.length - 1}, $${params.length})`;
+    }
+    // Paged: fetch one past what the page still needs, so a full page knows
+    // whether a readable note follows it.
+    const want = paged ? pageSize - out.length + 1 : 0;
+    if (paged) params.push(want);
+    const { rows } = await pool.query<{
+      id: string;
+      folder_id: string | null;
+      title: string | null;
+      rel_path: string;
+      updated_at: string;
+    }>(
+      `SELECT id, folder_id, title, rel_path, updated_at
+         FROM notes WHERE ${where} ORDER BY rel_path, id${paged ? ` LIMIT $${params.length}` : ""}`,
+      params,
+    );
+    await resolverCache.prefetch(pool, rows.map((r) => r.id));
+    for (const r of rows) {
+      const permission = await effectivePermission(ctx.auth.userId, r.id, pool, resolverCache);
+      if (permission === "none") continue; // members only see what's shared with them
+      if (out.length === pageSize) {
+        // A readable note exists past this page: point the cursor at the last
+        // note handed back.
+        const last = out[out.length - 1]!;
+        return { results: out, nextCursor: encodeNotesCursor(last.relPath, last.docId) };
+      }
+      out.push({
+        docId: r.id,
+        folderId: r.folder_id,
+        title: r.title ?? relPathStem(r.rel_path),
+        relPath: r.rel_path,
+        permission,
+        updatedAt: r.updated_at,
+      });
+    }
+    if (!paged) return out;
+    if (rows.length < want) return { results: out, nextCursor: null };
+    // The chunk was full but hidden notes kept the page short: read on.
+    const tail = rows[rows.length - 1]!;
+    after = [tail.rel_path, tail.id];
   }
-  return out;
 }
 
 /** Locate a live note + confirm it's in scope. Throws McpToolError otherwise. */
