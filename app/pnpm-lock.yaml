@@ -247,7 +247,7 @@ importers:
         version: 4.4.0(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
       '@hono/node-server':
         specifier: ^2.0.10
-        version: 2.0.10(hono@4.13.8)
+        version: 2.0.10(hono@4.13.13)
       '@node-rs/argon2':
         specifier: ^2.0.2
         version: 2.0.2
@@ -267,8 +267,8 @@ importers:
         specifier: ^22.1.1
         version: 22.1.1
       hono:
-        specifier: ^4.13.8
-        version: 4.13.8
+        specifier: ^4.13.11
+        version: 4.13.13
       ioredis:
         specifier: ^5.11.1
         version: 5.11.1
@@ -2258,8 +2258,8 @@ packages:
   hoist-non-react-statics@3.3.2:
     resolution: {integrity: sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw==}
 
-  hono@4.13.8:
-    resolution: {integrity: sha512-/Gng7NfoykZl2pjukW5Z6+8Yxm3BPRf86GTbQnt0SbySkvax4fyL4H3HhY1cCpBGmiW9XDRFzRV+CXK2W8QudQ==}
+  hono@4.13.13:
+    resolution: {integrity: sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==}
     engines: {node: '>=16.9.0'}
 
   html-encoding-sniffer@6.0.0:
@@ -3840,9 +3840,9 @@ snapshots:
     transitivePeerDependencies:
       - srvx
 
-  '@hono/node-server@2.0.10(hono@4.13.8)':
+  '@hono/node-server@2.0.10(hono@4.13.13)':
     dependencies:
-      hono: 4.13.8
+      hono: 4.13.13
 
   '@iconify/types@2.0.0': {}
 
@@ -4946,7 +4946,7 @@ snapshots:
     dependencies:
       react-is: 16.13.1
 
-  hono@4.13.8: {}
+  hono@4.13.13: {}
 
   html-encoding-sniffer@6.0.0(@noble/hashes@2.2.0):
     dependencies:
