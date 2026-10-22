@@ -424,6 +424,14 @@ export async function checkAndAutoInstall(): Promise<void> {
 export const LAUNCH_CHECK_TIMEOUT_MS = 4_000;
 
 /**
+ * How long the launch check's HTTP request itself may run. Longer than the
+ * gate's wait on purpose: the gate stops waiting at
+ * {@link LAUNCH_CHECK_TIMEOUT_MS}, the request keeps going and a late answer
+ * still installs (quiet-moment restart) instead of failing outright.
+ */
+export const LAUNCH_REQUEST_TIMEOUT_MS = 30_000;
+
+/**
  * How long a found update may keep sync waiting while it downloads. Generous —
  * a normal bundle lands in seconds — but finite, so a crawling connection opens
  * the app on the old build rather than never.
@@ -464,7 +472,14 @@ export async function launchUpdateGate(
   autoInstalling = true;
   autoAttempts = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  const found = checkForUpdate({ timeoutMs });
+  // The REQUEST gets its own, longer bound. Passing the gate's bound to the
+  // plugin aborted the request at the same instant the gate gave up, so the
+  // "late answer carries on in the background" path never ran: a cold TLS
+  // handshake on the 3-hop GitHub redirect chain (measured 5.5 s cold, 0.5 s
+  // warm) surfaced as "error sending request" every time it outlived 4 s.
+  const found = checkForUpdate({
+    timeoutMs: Math.max(timeoutMs, LAUNCH_REQUEST_TIMEOUT_MS),
+  });
   const raced = await Promise.race([
     found,
     new Promise<"timeout">((resolve) => {

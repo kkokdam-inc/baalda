@@ -12,7 +12,7 @@ const flushEgest = vi.fn(async () => {});
 const waitForQuietMoment = vi.fn(async () => {});
 
 vi.mock("@tauri-apps/plugin-updater", () => ({
-  check: () => check(),
+  check: (...args: unknown[]) => check(...args),
 }));
 vi.mock("@tauri-apps/plugin-process", () => ({
   relaunch: () => relaunch(),
@@ -328,6 +328,19 @@ describe("the launch gate", () => {
     expect(update.downloadAndInstall).toHaveBeenCalledTimes(1);
     expect(waitForQuietMoment).toHaveBeenCalledTimes(1);
     expect(relaunch).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives the request itself longer than the gate waits, so a slow answer is not aborted", async () => {
+    check.mockResolvedValue(null);
+    const updater = await loadUpdater();
+
+    await updater.launchUpdateGate({ timeoutMs: 1_000 });
+
+    // Passing the gate's bound to the plugin aborted a cold GitHub redirect
+    // chain at the same instant ("error sending request"), so the late-answer
+    // path never ran.
+    expect(check).toHaveBeenCalledWith({ timeout: updater.LAUNCH_REQUEST_TIMEOUT_MS });
+    expect(updater.LAUNCH_REQUEST_TIMEOUT_MS).toBeGreaterThan(updater.LAUNCH_CHECK_TIMEOUT_MS);
   });
 
   it("lets sync start when the install fails, keeping the one silent retry", async () => {
