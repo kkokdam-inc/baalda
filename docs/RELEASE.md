@@ -611,6 +611,8 @@ this is optional and can be deferred.
 
 ## Linux
 
-> Not currently built — `ubuntu-22.04` is commented out of the release matrix.
+> Linux x64 is built on `ubuntu-22.04` in the release matrix (`.AppImage`,
+> `.deb`, `.rpm`) and ships **unsigned** (see the platform table above).
 
-No OS-level signing gate. Bundles install as-is.
+No OS-level signing gate. Bundles install as-is; auto-update still verifies our
+minisign signature.
