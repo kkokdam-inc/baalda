@@ -110,6 +110,57 @@ describe("indexer — NUL bytes", () => {
   });
 });
 
+describe("indexer — live doc", () => {
+  beforeEach(async () => {
+    const { resetDb } = await import("./helpers/db.js");
+    await resetDb();
+  });
+  afterAll(async () => {
+    const { setLiveDocLookup } = await import("../src/index/indexer.js");
+    setLiveDocLookup(null);
+  });
+
+  it("reads a loaded doc's text from memory, and falls back to Postgres otherwise", async () => {
+    const { pool } = await import("../src/db/pool.js");
+    const { indexDoc, setLiveDocLookup } = await import("../src/index/indexer.js");
+    const { appendUpdate } = await import("../src/yjs/persistence.js");
+    const { seedOrg, seedVault, seedNote } = await import("./helpers/seed.js");
+    const Y = await import("yjs");
+    const org = await seedOrg("Live", "live-org");
+    const vault = await seedVault(org);
+    const docId = await seedNote(vault, null, "live.md");
+    const stored = new Y.Doc();
+    stored.getText("content").insert(0, "stored body");
+    await appendUpdate(docId, Y.encodeStateAsUpdate(stored));
+    stored.destroy();
+    const indexed = async () =>
+      (
+        await pool.query<{ content: string }>(
+          "SELECT content FROM note_index WHERE doc_id = $1",
+          [docId],
+        )
+      ).rows[0]?.content;
+
+    // Live: a doc the lookup returns wins — the store is never read for text.
+    const live = new Y.Doc();
+    live.getText("content").insert(0, "live body [[Linked]]");
+    const asked: Array<[string, string]> = [];
+    setLiveDocLookup((v, d) => {
+      asked.push([v, d]);
+      return d === docId ? live : undefined;
+    });
+    await expect(indexDoc(docId)).resolves.toBe(true);
+    expect(asked).toEqual([[vault, docId]]);
+    expect(await indexed()).toBe("live body [[Linked]]");
+
+    // Not loaded: the DB fallback is unchanged.
+    setLiveDocLookup(() => undefined);
+    await expect(indexDoc(docId)).resolves.toBe(true);
+    expect(await indexed()).toBe("stored body");
+    live.destroy();
+  });
+});
+
 /**
  * The boot backfill is the only self-heal the derived tables have, and the bulk
  * `docs/batch` path leans on it: that path hands its re-index to the 2 s

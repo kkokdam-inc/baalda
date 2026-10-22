@@ -18,7 +18,7 @@ import {
   setOrgChangedPublisher,
 } from "./sync/member-events.js";
 import { publishUserEvent, setUserEventPublisher } from "./sync/user-events.js";
-import { backfillIndex } from "./index/indexer.js";
+import { backfillIndex, setLiveDocLookup } from "./index/indexer.js";
 import { startBlobGc, stopBlobGc } from "./blobs/gc.js";
 import { startTrashPurge, stopTrashPurge } from "./trash/scheduler.js";
 import { setLapseNotifier, startLapseScheduler, stopLapseScheduler } from "./billing/lapse.js";
@@ -172,6 +172,9 @@ async function main() {
     },
   );
   await sync.listen();
+  // The indexer reads a loaded doc's text from memory rather than reloading it
+  // from Postgres after every debounced edit burst.
+  setLiveDocLookup((vaultId, docId) => sync.hocuspocus.documents.get(formatDocName(vaultId, docId)));
 
   // Both structural and ACL changes drop this instance's display-only readable
   // sets for the vault first (#261, `permissions/readable-cache.ts`).
