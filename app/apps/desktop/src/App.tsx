@@ -1246,6 +1246,15 @@ export default function App() {
       // Baalda"); no update, an offline launch or a check slower than
       // LAUNCH_CHECK_TIMEOUT_MS falls straight through. Not in a dev build —
       // see the note on the poll below.
+      //
+      // Only the session READ overlaps the gate: `authManager.init()` (keychain
+      // + one round trip) touches no store state and starts no sync. Landing the
+      // session in the store is what arms the reconcile and the membership
+      // checks, so that still waits for the gate below.
+      const sessionRead = authManager.init();
+      // Handled where it is consumed (initAuth); this only keeps an early
+      // rejection from surfacing as unhandled while the gate runs.
+      sessionRead.catch(() => {});
       if (!import.meta.env.DEV) {
         await launchUpdateGate({ onUpdating: (v) => setLaunchUpdating(v) });
         setLaunchUpdating(null);
@@ -1256,7 +1265,7 @@ export default function App() {
       // a sign-in/sign-out the user performs meanwhile still wins.
       void useStore
         .getState()
-        .initAuth()
+        .initAuth({ session: sessionRead })
         .catch((e) => console.error("auth init failed", e));
       // Check for updates on a background poll too (the launch check ran
       // above), and install what we find WITHOUT asking: a found release is

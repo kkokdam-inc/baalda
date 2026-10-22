@@ -756,7 +756,10 @@ interface AppStore {
   closeAllTabs: () => void;
 
   // Auth actions
-  initAuth: () => Promise<void>;
+  /** `session`: an `authManager.init()` already in flight (launch starts it
+   *  beside the update gate so the keychain read + session round trip overlap
+   *  it); omitted, the restore starts its own. */
+  initAuth: (opts?: { session?: Promise<SessionInfo | null> }) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
@@ -3086,7 +3089,7 @@ export const useStore = create<AppStore>((set, get) => ({
 
   // ---- Auth ----
 
-  initAuth: async () => {
+  initAuth: async (opts) => {
     syncManager.setStatusListener((status) => get().setSyncStatus(status));
     // The closed-app edits pass (#284) skips padlocked notes, read from the same
     // lock view the editor and sidebar use, fetched fresh (a throw = push nothing).
@@ -3259,7 +3262,7 @@ export const useStore = create<AppStore>((set, get) => ({
     let gen = ++authInitGen;
     const superseded = () => authInitGen !== gen;
     try {
-      const session = await authManager.init();
+      const session = await (opts?.session ?? authManager.init());
       perf.mark("auth-resolved");
       if (superseded()) return;
       set({ serverUrl: authManager.getServerUrl() });
