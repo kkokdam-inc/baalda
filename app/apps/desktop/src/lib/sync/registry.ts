@@ -2170,7 +2170,7 @@ export class VaultRegistry {
       if (!firstTime) return "failed";
       f = {
         ...f,
-        reason: "deleted on the server by another member — kept on this device, no longer synced",
+        reason: "deleted on the server by another member. Kept on this device, no longer synced",
       };
     }
     const holdBase =
@@ -2206,7 +2206,7 @@ export class VaultRegistry {
     if (f.code === "root_frozen" && !frozenRootNotified.has(f.path)) {
       frozenRootNotified.add(f.path);
       toast(
-        `"${f.path}" can't sync — this vault's root is frozen. Move it into a folder to sync it.`,
+        `"${f.path}" can't sync. This vault's root is frozen. Move it into a folder to sync it.`,
         "error",
       );
     }

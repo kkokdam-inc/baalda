@@ -91,7 +91,7 @@ export async function saveAttachment(bytes: Uint8Array, ext: string, epoch?: ipc
   const limit = maxBytesFor(ext);
   if (bytes.byteLength > limit) {
     toast(
-      `That file is ${humanBytes(bytes.byteLength)} — attachments up to ${humanBytes(limit)} sync.`,
+      `That file is ${humanBytes(bytes.byteLength)}. Attachments up to ${humanBytes(limit)} sync.`,
       "error",
     );
     throw new AttachmentTooLargeError(ext, bytes.byteLength, limit);

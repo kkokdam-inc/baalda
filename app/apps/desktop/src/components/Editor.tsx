@@ -985,7 +985,7 @@ export function Editor() {
           <div className="version-preview">
             <div className="version-preview-host" ref={previewHostRef} />
             <span className="version-preview-pill" role="status">
-              Viewing version from {agoFromIso(previewedAt, Date.now())} — read-only
+              Viewing version from {agoFromIso(previewedAt, Date.now())} (read-only)
             </span>
           </div>
         )}

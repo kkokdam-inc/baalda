@@ -224,7 +224,7 @@ export function LocalOnlyGroup({
         >
           {error && <p role="alert" className="auth-error">{error}</p>}
           <p>
-            These exist only on this computer — the Remote Vault has no copy — so deleting them
+            These exist only on this computer (the Remote Vault has no copy), so deleting them
             removes them for good. Save a copy first if you need them.
           </p>
           {confirmDelete.some((r) => r.kind === "folder") && (

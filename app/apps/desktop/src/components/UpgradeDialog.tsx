@@ -500,7 +500,7 @@ export function UpgradeDialog({
               {busy && <span className="btn-spinner" aria-hidden="true" />}
               <span>
                 Upgrade
-                {selected ? ` — ${formatPrice(selected)}${perLabel(selected.interval)}` : ""}
+                {selected ? `, ${formatPrice(selected)}${perLabel(selected.interval)}` : ""}
               </span>
             </button>
           </>
@@ -512,7 +512,7 @@ export function UpgradeDialog({
             <div className="subhead">Waiting for payment…</div>
             <div className="muted">
               Complete the checkout in your browser. This unlocks automatically once
-              your payment is confirmed — you can leave this open.
+              your payment is confirmed. You can leave this open.
             </div>
             {error && <div className="auth-error">{error}</div>}
             <div className="upgrade-waiting-actions">
@@ -533,7 +533,7 @@ export function UpgradeDialog({
             <div className="subhead">Still waiting on payment</div>
             <div className="muted">
               We haven't seen the payment confirmed yet. If you finished checkout, it
-              can take a moment — check again below.
+              can take a moment. Check again below.
             </div>
             {error && <div className="auth-error">{error}</div>}
             <div className="upgrade-waiting-actions">

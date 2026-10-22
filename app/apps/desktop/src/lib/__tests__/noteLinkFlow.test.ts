@@ -64,7 +64,7 @@ describe("openNoteFailureMessage", () => {
   });
 
   it("keeps the EXACT generic anti-enumeration text otherwise", () => {
-    const generic = "Couldn't open that note — you may not have access to it";
+    const generic = "Couldn't open that note. You may not have access to it";
     expect(openNoteFailureMessage({ syncEnabled: true, syncStatus: "synced" })).toBe(generic);
     expect(openNoteFailureMessage({ syncEnabled: false, syncStatus: "offline" })).toBe(generic);
   });

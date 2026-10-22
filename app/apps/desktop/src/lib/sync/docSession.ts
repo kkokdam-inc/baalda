@@ -200,7 +200,7 @@ function diskDeleteCap(mappedCount: number): number {
 const FOLDER_MOVE_MIN_RATIO = 0.8;
 /** The Health row reason for a note held by an unanswered bulk delete. */
 export const DELETE_DECISION_REASON =
-  "removed from this folder in a bulk delete — it stays for your team and will be restored here";
+  "removed from this folder in a bulk delete. It stays for your team and will be restored here";
 /** How long an appeared folder stays a candidate for a move's new half. */
 const FOLDER_CANDIDATE_TTL_MS = 10_000;
 
@@ -1113,13 +1113,13 @@ export class SyncManager implements InboundHost {
         this.note("info", "connect", `Connected to ${this.serverHost()}`);
         return;
       case "offline":
-        this.note("warn", "offline", "Connection lost — reconnecting");
+        this.note("warn", "offline", "Connection lost. Reconnecting");
         return;
       case "read-only":
         this.note(
           "info",
           "read-only",
-          "You have view-only access here — your edits stay on this device",
+          "You have view-only access here. Your edits stay on this device",
         );
         return;
       case "no-access":
@@ -1134,7 +1134,7 @@ export class SyncManager implements InboundHost {
         this.note("error", "too-large", "The open note is too large for the server to accept");
         return;
       case "error":
-        this.note("warn", "error", "The server could not be reached — retrying");
+        this.note("warn", "error", "The server could not be reached. Retrying");
         return;
       default:
         // "connecting" — a handshake in progress is not news.
@@ -1157,7 +1157,7 @@ export class SyncManager implements InboundHost {
     this.loggedPhase = phase;
     if (phase == null || phase === "idle") return;
     if (phase === "removing") {
-      this.note("info", "run-start", "Updating access — checking local copies");
+      this.note("info", "run-start", "Updating access: checking local copies");
       return;
     }
     if (phase === "registering" || phase === "uploading" || phase === "downloading") {
@@ -1169,7 +1169,7 @@ export class SyncManager implements InboundHost {
     }
     if (phase === "done") {
       const confirmed = p ? Math.max(0, p.done - p.failed) : 0;
-      this.note("info", "run-done", `Sync finished — ${confirmed} notes confirmed`);
+      this.note("info", "run-done", `Sync finished: ${confirmed} notes confirmed`);
       return;
     }
     // "error" — the run ended without getting everything through.
@@ -1180,7 +1180,7 @@ export class SyncManager implements InboundHost {
       this.note(
         "error",
         "run-failed",
-        "Sync could not finish — the app never reached the server",
+        "Sync could not finish. The app never reached the server",
       );
     }
   }
@@ -1204,7 +1204,7 @@ export class SyncManager implements InboundHost {
           : f.kind === "shrink-held"
             ? "shrink-held"
             : "push-failed",
-      `${f.relPath} — ${f.reason}`,
+      `${f.relPath}: ${f.reason}`,
       { docId: f.docId, path: f.relPath },
     );
   }
@@ -1214,7 +1214,7 @@ export class SyncManager implements InboundHost {
     this.note(
       "error",
       "register-failed",
-      `${f.path} — ${f.reason}${f.code ? ` (${f.code})` : ""}`,
+      `${f.path}: ${f.reason}${f.code ? ` (${f.code})` : ""}`,
       { docId: f.docId, path: f.path },
     );
   }
@@ -2036,8 +2036,8 @@ export class SyncManager implements InboundHost {
       "warn",
       "revoked",
       trashedTo
-        ? `Access to ${path} was removed — a copy is in .context/trash`
-        : `Access to ${path} was removed — it was taken off this device`,
+        ? `Access to ${path} was removed. A copy is in .context/trash`
+        : `Access to ${path} was removed. It was taken off this device`,
       { docId, path },
     );
   }
@@ -2095,7 +2095,7 @@ export class SyncManager implements InboundHost {
   handleServerReauth(scope: VaultScope): void {
     if (!scope.isCurrent()) return;
     this.aclChangedAt = Date.now();
-    this.note("info", "reauth", "Permissions changed — re-checking access");
+    this.note("info", "reauth", "Permissions changed. Re-checking access");
     // An access change can be exactly what was failing: retry everything now.
     this.retryBackoff.clearAll();
     // Two things follow from "the ACL moved". The open note re-mints its token so
@@ -2403,7 +2403,7 @@ export class SyncManager implements InboundHost {
       this.retryBackoff.clear(mapping.docId);
       this.invalidatedFailures.delete(mapping.docId);
       this.localChanges.set(mapping.docId, relPath);
-      this.note("info", "push-queued", "Changed on disk while closed — checking it against the server", {
+      this.note("info", "push-queued", "Changed on disk while closed. Checking it against the server", {
         docId: mapping.docId,
         path: relPath,
       });
@@ -2695,7 +2695,7 @@ export class SyncManager implements InboundHost {
         this.note(
           "info",
           "disk-delete",
-          `${d.relPath} was deleted on this device — removed from the server for everyone`,
+          `${d.relPath} was deleted on this device and removed from the server for everyone`,
           { docId: d.docId, path: d.relPath },
         );
         // The OPEN note keeps its bridge deliberately. The editor is still
@@ -2870,14 +2870,14 @@ export class SyncManager implements InboundHost {
       items.map((d) => d.relPath).slice(0, 10),
     );
     toast(
-      `${items.length} notes disappeared from disk at once — they were NOT removed from the server. ` +
+      `${items.length} notes disappeared from disk at once. They were NOT removed from the server. ` +
         `If the folder was unmounted or checked out, reopening the vault restores them.`,
       "error",
     );
     this.note(
       "warn",
       "bulk-delete-refused",
-      `${items.length} notes vanished from this folder at once — they were left on the server ` +
+      `${items.length} notes vanished from this folder at once. They were left on the server ` +
         `in case the folder was unmounted or checked out`,
     );
     for (const d of items) {
@@ -3010,7 +3010,7 @@ export class SyncManager implements InboundHost {
     // The file at the new path may hold edits made in the same breath as the
     // rename, and the note's row moved, so both surfaces need telling.
     this.localChanges.set(docId, to);
-    this.note("info", "push-queued", "Renamed on disk — re-sending it under the new name", {
+    this.note("info", "push-queued", "Renamed on disk. Re-sending it under the new name", {
       docId,
       path: to,
     });
@@ -3268,7 +3268,7 @@ export class SyncManager implements InboundHost {
       edited++;
     }
     if (edited > 0) this.armLocalChangeDrain(scope, LOCAL_CHANGE_DEBOUNCE_MS);
-    this.note("info", "folder-moved", `${from} was moved to ${to} on this device — kept as a move for everyone`, {
+    this.note("info", "folder-moved", `${from} was moved to ${to} on this device, kept as a move for everyone`, {
       path: to,
     });
     // The open note and the tabs are re-pointed by prefix, like an inbound move.
@@ -3329,7 +3329,7 @@ export class SyncManager implements InboundHost {
     // An unanswered bulk delete is now the unmounted case: never asked.
     this.deleteDecision = null;
     this.deleteDecisionIds = new Set();
-    this.note("warn", "vault-root-missing", "The vault folder is missing — restore it here or locate where it moved");
+    this.note("warn", "vault-root-missing", "The vault folder is missing. Restore it here or locate where it moved");
     this.emitStructureNotice();
   }
 
@@ -3475,7 +3475,7 @@ export class SyncManager implements InboundHost {
     this.note(
       "warn",
       "bulk-delete-held",
-      `${this.deleteDecision.length} notes were removed from this folder at once — they stay for the team and will be restored here`,
+      `${this.deleteDecision.length} notes were removed from this folder at once. They stay for the team and will be restored here`,
     );
     this.emitStructureNotice();
   }
@@ -5873,7 +5873,7 @@ export class SyncManager implements InboundHost {
     this.note(
       "error",
       "server-too-old",
-      "Update your Baalda server — this app needs its bulk sync routes",
+      "Update your Baalda server. This app needs its bulk sync routes",
     );
     this.progress?.phase("error");
     this.progress?.flush();
@@ -6781,7 +6781,7 @@ export class SyncManager implements InboundHost {
         const relPath = this.registry.pathForDocId(docId);
         if (relPath) {
           this.localChanges.set(docId, relPath);
-          this.note("info", "push-queued", "Merged an edit made outside Baalda — sending the result", {
+          this.note("info", "push-queued", "Merged an edit made outside Baalda. Sending the result", {
             docId,
             path: relPath,
           });

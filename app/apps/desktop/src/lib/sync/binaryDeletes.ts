@@ -459,7 +459,7 @@ export class BinaryDeleteQueue {
           deletes.slice(0, 10).map((d) => d.relPath),
         );
         this.deps.notify?.(
-          `${deletes.length} files disappeared from disk at once — they were NOT removed from the server. ` +
+          `${deletes.length} files disappeared from disk at once. They were NOT removed from the server. ` +
             `If the folder was unmounted or checked out, reopening the vault restores them.`,
           "error",
         );

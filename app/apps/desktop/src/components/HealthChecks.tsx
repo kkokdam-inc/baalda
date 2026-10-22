@@ -281,7 +281,7 @@ function CheckItem({
           <button
             type="button"
             className="link-btn health-check-ignore"
-            title="Stop showing this check for this vault on this device — it waits in the Ignored list"
+            title="Stop showing this check for this vault on this device. It waits in the Ignored list"
             onClick={() => onIgnore(def.id)}
           >
             Ignore

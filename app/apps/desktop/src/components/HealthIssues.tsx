@@ -182,7 +182,7 @@ export function HealthIssues({
               }
               title={
                 deletable.length > 1
-                  ? "Deleting more than one at a time is not offered here — delete them one by one so each confirm names the note"
+                  ? "Deleting more than one at a time is not offered here. Delete them one by one so each confirm names the note"
                   : undefined
               }
               disabled={deletable.length > 1}
@@ -453,7 +453,7 @@ function IssueRow({
           className="health-issue-check"
           checked={selected}
           onChange={onSelect}
-          aria-label={`Select ${issue.title}${issue.path ? ` — ${issue.path}` : ""}`}
+          aria-label={`Select ${issue.title}${issue.path ? `, ${issue.path}` : ""}`}
         />
         <span className="health-issue-summary" title={issue.why}>
           <span
@@ -482,7 +482,7 @@ function IssueRow({
           <button
             type="button"
             className="link-btn health-issue-dismiss"
-            title="Hide this row for this vault on this device — it waits in the Ignored list"
+            title="Hide this row for this vault on this device. It waits in the Ignored list"
             onClick={onDismiss}
           >
             Ignore
@@ -626,7 +626,7 @@ function Remedy({
             const out = await actions.contactOwner();
             toast(
               out.owner
-                ? `Request copied — send it to ${out.owner.name} (${out.owner.email})`
+                ? `Request copied. Send it to ${out.owner.name} (${out.owner.email})`
                 : "Request copied to clipboard. This vault's owner is not known on this device yet.",
             );
           }}

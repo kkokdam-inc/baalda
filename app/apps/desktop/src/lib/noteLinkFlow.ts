@@ -75,7 +75,7 @@ export interface OpenNoteFailureInputs {
  */
 export function openNoteFailureMessage(i: OpenNoteFailureInputs): string {
   if (i.syncEnabled && (i.syncStatus === "offline" || i.syncStatus === "connecting" || i.syncStatus === "error")) {
-    return "Couldn't reach the server to fetch that note — check your connection and open the link again";
+    return "Couldn't reach the server to fetch that note. Check your connection and open the link again";
   }
-  return "Couldn't open that note — you may not have access to it";
+  return "Couldn't open that note. You may not have access to it";
 }

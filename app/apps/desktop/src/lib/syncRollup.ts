@@ -348,7 +348,7 @@ export const DOC_SYNC_TITLES: Record<DocSyncState, string> = {
   queued: "Waiting to sync",
   syncing: "Syncing…",
   synced: "Synced",
-  error: "Couldn't sync — this note is only on this device",
+  error: "Couldn't sync. This note is only on this device",
 };
 
 /**
@@ -362,7 +362,7 @@ export const FILE_SYNC_TITLES: Record<DocSyncState, string> = {
   queued: "Waiting to upload",
   syncing: "Uploading…",
   synced: "Synced",
-  error: "Couldn't upload — this file is only on this device",
+  error: "Couldn't upload. This file is only on this device",
 };
 
 function plural(n: number, word: string): string {

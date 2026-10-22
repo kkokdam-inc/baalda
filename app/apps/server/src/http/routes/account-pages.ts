@@ -61,7 +61,7 @@ accountPageRoutes.get("/forgot-password", (c) => {
       <button type="submit" class="primary">Email me a reset link</button>
     </form>
     <div id="done" style="display:none">
-      <div class="ok">Reset link sent to <b id="who"></b>. Check your inbox (and spam) — the link is valid for one hour.</div>
+      <div class="ok">Reset link sent to <b id="who"></b>. Check your inbox (and spam). The link is valid for one hour.</div>
     </div>
     <p class="foot"><a class="plain" href="/oauth/login">Back to sign in</a></p>
     <script>
@@ -80,7 +80,7 @@ accountPageRoutes.get("/forgot-password", (c) => {
           });
           if (!res.ok) {
             const j = await res.json().catch(()=>({}));
-            if (j.error === 'no_account') throw new Error('There is no account for ' + email + ' on this server. Check the address — or the server, if your team runs its own.');
+            if (j.error === 'no_account') throw new Error('There is no account for ' + email + ' on this server. Check the address (or the server, if your team runs its own).');
             throw new Error(j.message || 'Could not send the email');
           }
           document.getElementById('who').textContent = email;
@@ -182,7 +182,7 @@ accountPageRoutes.get("/email-verified", (c) => {
   return c.html(
     page({
       title: "Email confirmed",
-      body: `<h1>Email confirmed</h1><p class="sub">Thanks — your address is verified. Taking you back to ${esc(
+      body: `<h1>Email confirmed</h1><p class="sub">Thanks, your address is verified. Taking you back to ${esc(
         BRAND_NAME,
       )}…</p>
       <a class="btn primary" href="${esc(VERIFIED_DEEP_LINK)}" style="display:block;text-decoration:none">Open ${esc(
@@ -221,7 +221,7 @@ accountPageRoutes.get("/invite/:id", async (c) => {
         title: "Invitation unavailable",
         body: `<h1>${esc(why)}</h1><p class="sub">Ask the person who invited you to <b>${esc(
           inv.organizationName,
-        )}</b> to send a new invitation${state === "accepted" ? ", or just sign in — you may already be a member" : ""}.</p>`,
+        )}</b> to send a new invitation${state === "accepted" ? ", or just sign in. You may already be a member" : ""}.</p>`,
       }),
       410,
     );
@@ -240,7 +240,7 @@ accountPageRoutes.get("/invite/:id", async (c) => {
     )}</a>
     <p class="sub" style="margin-top:18px">Sign in with <b>${esc(
       inv.email,
-    )}</b> — or create an account with that address — and you'll land in the vault.</p>
+    )}</b> (or create an account with that address) and you'll land in the vault.</p>
     <p class="foot">Don't have ${esc(BRAND_NAME)} yet? <a href="https://baalda.com" rel="noopener">Get it</a>, then open this link again.</p>
     <script>location.href = ${JSON.stringify(deepLink)};</script>`;
   return c.html(page({ title: `Join ${inv.organizationName}`, body }));

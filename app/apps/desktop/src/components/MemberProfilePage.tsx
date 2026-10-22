@@ -376,9 +376,9 @@ function runSentence(run: Extract<TimelineEntry, { type: "run" }>, voice: Voice)
     const folder = commonFolder(run.events);
     return folder
       ? <>{lead(voice, "created")} <strong>{count}</strong> in {folder}</>
-      : <>{lead(voice, "created")} <strong>{count}</strong> — {runNames(run.events)}</>;
+      : <>{lead(voice, "created")} <strong>{count}</strong>: {runNames(run.events)}</>;
   }
-  return <>{lead(voice, "edited")} <strong>{count}</strong> — {runNames(run.events)}</>;
+  return <>{lead(voice, "edited")} <strong>{count}</strong>: {runNames(run.events)}</>;
 }
 
 /** One activity entry's sentence, told from the member's side, the item in bold. */

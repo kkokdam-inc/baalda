@@ -754,7 +754,7 @@ function pushRename(
       kind: "rename",
       path: to,
       docId,
-      reason: `the server moved this note to ${to}, but another note already occupies that path — left at ${from}`,
+      reason: `the server moved this note to ${to}, but another note already occupies that path, so it was left at ${from}`,
     });
     return;
   }

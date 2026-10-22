@@ -32,10 +32,10 @@ export function LimitNudge({
   const message = teamVault
     ? teamVaultLimitCopy(n)
     : kind === "note_limit" ? (teamMode ? "This vault has reached its sync limit. Upgrade to Team to lift it." : `This Free vault has reached ${n.toLocaleString()} synced notes. Upgrade to Team to sync more; additional notes stay on this device.`) : kind === "member_limit"
-      ? `Free plan limit reached — this vault allows ${n} member${n === 1 ? "" : "s"}.`
+      ? `Free plan limit reached: this vault allows ${n} member${n === 1 ? "" : "s"}.`
       : // The cap counts FREE vaults only: a Team vault leaves the count, so
         // upgrading one of them opens a slot for another free vault.
-        `You're using all ${n} free vault${n === 1 ? "" : "s"}. Move one to a Team account ($10/seat/month, minimum 3 seats) — Team vaults don't count toward that limit — and you can create another.`;
+        `You're using all ${n} free vault${n === 1 ? "" : "s"}. Move one to a Team account ($10/seat/month, minimum 3 seats) and you can create another. Team vaults don't count toward that limit.`;
   return (
     <div className="limit-nudge">
       <span>{message}</span>

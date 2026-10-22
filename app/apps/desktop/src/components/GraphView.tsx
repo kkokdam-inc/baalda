@@ -1648,7 +1648,7 @@ export function GraphView({ onClose }: { onClose: () => void }) {
               zIndex: 5,
             }}
           >
-            WebGL unavailable — showing capped 2D fallback. {webglError}
+            WebGL unavailable. Showing capped 2D fallback. {webglError}
           </div>
         )}
         {WEBGL_ENABLED && settings.scope === "global" && diag && (

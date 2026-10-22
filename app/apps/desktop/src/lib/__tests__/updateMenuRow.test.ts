@@ -30,7 +30,7 @@ describe("updateCheckToast", () => {
       tone: "neutral",
     });
     expect(updateCheckToast({ phase: "available", version: "0.1.82" })?.text).toBe(
-      "Version 0.1.82 found — starting the download…",
+      "Version 0.1.82 found. Starting the download…",
     );
     expect(updateCheckToast({ phase: "error", message: "offline" })).toEqual({
       text: "Couldn't check for updates: offline",

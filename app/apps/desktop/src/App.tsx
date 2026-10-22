@@ -377,7 +377,7 @@ function VaultRootMissingBanner() {
     try {
       await fn();
     } catch (e) {
-      toast(`Couldn't recover the vault folder — ${e instanceof Error ? e.message : String(e)}`, "error");
+      toast(`Couldn't recover the vault folder: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {
       setBusy(false);
     }
@@ -640,7 +640,7 @@ function VaultFolderPrompt() {
         ) : (
           <p className="wf-desc">
             Choose the local folder this vault syncs to. Each vault keeps its
-            own folder — separate from your other vaults.
+            own folder, separate from your other vaults.
           </p>
         )}
         <div className="vault-folder-actions">
@@ -784,8 +784,8 @@ function UpdateGate({ launchVersion = null }: { launchVersion?: string | null })
                 : update.phase === "available"
                   ? "Starting the download…"
                   : update.phase === "downloading"
-                  ? `Downloading v${update.version}${pct != null ? ` — ${pct}%` : "…"}`
-                  : "Installing — the app will restart itself…"}
+                  ? `Downloading v${update.version}${pct != null ? `: ${pct}%` : "…"}`
+                  : "Installing. The app will restart itself…"}
             </p>
             {/* A determinate bar when the server sent a content length, an
                 indeterminate sweep when it didn't — a bar that fills to an
@@ -810,8 +810,8 @@ function UpdateGate({ launchVersion = null }: { launchVersion?: string | null })
             {required ? (
               <p>
                 {BRAND_NAME} couldn&rsquo;t install the update to <strong>v{required}</strong>
-                {"message" in update && update.message ? ` — ${update.message}` : ""}. It tried
-                twice on its own. Check your connection and try again — your notes stay right
+                {"message" in update && update.message ? ` (${update.message})` : ""}. It tried
+                twice on its own. Check your connection and try again. Your notes stay right
                 where they are, on your disk.
               </p>
             ) : (
@@ -938,7 +938,7 @@ function WhatsNewModal() {
             <h2 className="whats-new-title">What&rsquo;s New</h2>
             <span className="whats-new-version">v{updated.version}</span>
             <p className="whats-new-sub">
-              {BRAND_NAME} updated itself to the latest version — here&rsquo;s what
+              {BRAND_NAME} updated itself to the latest version. Here&rsquo;s what
               changed.
             </p>
           </div>
@@ -965,7 +965,7 @@ function WhatsNewModal() {
             </ul>
           )}
           <button className="primary whats-new-cta" autoFocus onClick={close}>
-            Nice — let&rsquo;s go
+            Nice, let&rsquo;s go
           </button>
         </div>
       </div>
@@ -1462,7 +1462,7 @@ export default function App() {
         const vault = useStore.getState().vault;
         if (!vault || vault.epoch !== e.epoch) return;
         perf.mark("index-ready");
-        if (!e.ok) toast("Couldn't finish indexing this vault — search and backlinks may be incomplete.", "error");
+        if (!e.ok) toast("Couldn't finish indexing this vault. Search and backlinks may be incomplete.", "error");
         void useStore.getState().refreshTitles();
         void useStore.getState().refreshBacklinks();
       });

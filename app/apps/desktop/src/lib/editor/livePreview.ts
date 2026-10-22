@@ -508,7 +508,7 @@ class CsvEmbedWidget extends WidgetType {
     if (truncatedRows || truncatedCols) {
       const footer = document.createElement("div");
       footer.className = "cm-md-csv-note";
-      footer.textContent = `Showing the first ${body.length} rows — open the file for the rest`;
+      footer.textContent = `Showing the first ${body.length} rows. Open the file for the rest`;
       wrap.appendChild(footer);
     }
   }

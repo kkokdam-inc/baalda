@@ -82,7 +82,7 @@ export function VaultIconSettings({
     try {
       await persist(value);
     } catch (e) {
-      toast(`Couldn't change the vault icon — ${e instanceof Error ? e.message : String(e)}`, "error");
+      toast(`Couldn't change the vault icon: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {
       setPending(null);
     }

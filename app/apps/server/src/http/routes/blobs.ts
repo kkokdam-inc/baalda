@@ -175,7 +175,7 @@ async function registerRefusal(
       return c.json({ error: out.message, code: out.code }, 400);
     case "root_frozen":
       return c.json(
-        { error: "This vault's root is frozen — create this inside a folder instead.", code: "root_frozen" },
+        { error: "This vault's root is frozen. Create this inside a folder instead.", code: "root_frozen" },
         403,
       );
     case "not_readable":
@@ -509,7 +509,7 @@ blobRoutes.post(
         ? Math.min(Math.trunc(declared), MAX_BLOB_BYTES)
         : MAX_BLOB_BYTES;
     if (!(await uploadBudget.acquire(reserve))) {
-      return c.json({ error: "Too many uploads in flight — retry shortly" }, 503, {
+      return c.json({ error: "Too many uploads in flight. Retry shortly" }, 503, {
         "Retry-After": "5",
       });
     }
@@ -611,7 +611,7 @@ blobRoutes.post(
           await client.query("ROLLBACK");
           const winner = await findBlob(vaultId, sha256, docId);
           if (winner) return c.json({ ...toMeta(await claimDoc(winner, docId)), deduped: true }, 200);
-          return c.json({ error: "Upload conflicted — retry" }, 409);
+          return c.json({ error: "Upload conflicted. Retry" }, 409);
         }
         await store.put(
           {
@@ -1161,7 +1161,7 @@ blobRoutes.post("/vaults/:vaultId/blobs/intent", async (c) => {
       // insert. The winner's row is the answer, not a 409.
       const winner = await findBlob(vaultId, sha256, docId);
       if (winner) return dedupedAnswer(winner);
-      return c.json({ error: "Upload conflicted — retry" }, 409);
+      return c.json({ error: "Upload conflicted. Retry" }, 409);
     }
   }
 
@@ -1305,7 +1305,7 @@ blobRoutes.put(
       return c.json({ error: "Attachment too large", code: "attachment_too_large" }, 413);
     }
     if (!(await uploadBudget.acquire(declared))) {
-      return c.json({ error: "Too many uploads in flight — retry shortly" }, 503, {
+      return c.json({ error: "Too many uploads in flight. Retry shortly" }, 503, {
         "Retry-After": "5",
       });
     }

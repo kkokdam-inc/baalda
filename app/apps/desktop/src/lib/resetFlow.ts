@@ -33,7 +33,7 @@ function serverMessage(err: unknown): string | null {
 export function passwordResetFailureMessage(err: unknown, ctx: ResetFailureContext): string {
   const code = errorCode(err);
   if (code === "no_account" || (err instanceof ApiError && err.status === 404)) {
-    return `There's no account for ${ctx.email} on ${ctx.serverHost}. Check the address — or the server, if your team runs its own — or sign up instead.`;
+    return `There's no account for ${ctx.email} on ${ctx.serverHost}. Check the address (or the server, if your team runs its own), or sign up instead.`;
   }
   if (code === "send_failed") {
     return `The reset email couldn't be sent. ${serverMessage(err) ?? ""} Try again in a minute, or contact whoever runs this server.`.replace(/\s+/g, " ");

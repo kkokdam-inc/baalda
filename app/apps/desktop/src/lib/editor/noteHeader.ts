@@ -183,7 +183,7 @@ class InvalidWidget extends WidgetType {
     strong.textContent = "Properties can't be shown";
     const rest = document.createElement("span");
     rest.textContent =
-      " — this note's YAML is outside what Baalda edits, so it is shown as text and never rewritten.";
+      ". This note's YAML is outside what Baalda edits, so it is shown as text and never rewritten.";
     host.append(strong, rest);
     return host;
   }

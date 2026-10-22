@@ -52,14 +52,14 @@ function planCopy(plan: SuccessPlan): { title: string; heading: string; sub: str
         ? `Your team has ${text(String(seats))} ${seats === 1 ? "seat" : "seats"}. Every vault on your account now syncs without limits.`
         : "Your vaults now sync without limits.";
     return {
-      title: "You're on Team — Baalda",
+      title: "You're on Team | Baalda",
       heading: "You&rsquo;re on Team",
       sub,
       foot: "your Team plan is already active",
     };
   }
   return {
-    title: "You're on Pro — Baalda",
+    title: "You're on Pro | Baalda",
     heading: "You&rsquo;re on Pro",
     sub: "Your vault is now unlimited.",
     foot: "your subscription is already there",

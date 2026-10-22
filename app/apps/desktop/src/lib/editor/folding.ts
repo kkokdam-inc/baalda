@@ -102,7 +102,7 @@ function placeholderDOM(_view: EditorView, onclick: (event: Event) => void): HTM
   el.className = "cm-foldPlaceholder";
   el.textContent = "…";
   el.title = "Click to unfold";
-  el.setAttribute("aria-label", "Folded — click to unfold");
+  el.setAttribute("aria-label", "Folded. Click to unfold");
   // CodeMirror's own handler: it knows which range this placeholder stands for.
   el.addEventListener("click", onclick);
   return el;

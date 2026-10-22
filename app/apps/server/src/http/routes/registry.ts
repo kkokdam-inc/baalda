@@ -113,7 +113,7 @@ export { isRootFrozen };
 
 /** The 403 body every frozen-root refusal shares, so clients can match on a code. */
 const ROOT_FROZEN_ERROR = {
-  error: "This vault's root is frozen — create this inside a folder instead.",
+  error: "This vault's root is frozen. Create this inside a folder instead.",
   code: "root_frozen",
 } as const;
 
@@ -1069,7 +1069,7 @@ export function createRegistryRoutes(deps: RegistryDeps = {}): Hono {
       if (gainsConflictSuffix(row.rel_path, moveInput.relPath)) {
         return c.json(
           {
-            error: "A teammate's note can't be renamed to a conflict name — keep yours as the copy",
+            error: "A teammate's note can't be renamed to a conflict name. Keep yours as the copy",
             code: "conflict_rename_refused",
           },
           409,
@@ -1080,7 +1080,7 @@ export function createRegistryRoutes(deps: RegistryDeps = {}): Hono {
         c.header("Retry-After", String(budget.retryAfter));
         return c.json(
           {
-            error: "Too many of your teammates' notes renamed at once — try again shortly",
+            error: "Too many of your teammates' notes renamed at once. Try again shortly",
             code: "rename_rate_limited",
           },
           429,

@@ -2370,7 +2370,7 @@ export class AttachmentSync {
     if (this.storageLimitNotified) return;
     this.storageLimitNotified = true;
     this.deps.notify?.(
-      "This vault is out of attachment storage — new files won't sync until you free space or upgrade.",
+      "This vault is out of attachment storage. New files won't sync until you free space or upgrade.",
       "error",
     );
   }

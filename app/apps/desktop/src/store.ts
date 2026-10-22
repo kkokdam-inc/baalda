@@ -1612,7 +1612,7 @@ function promptSignInForQueuedLink(
   set: (partial: Partial<AppStore>) => void,
 ): void {
   set({ authPrompt: "note-link" });
-  toast("Sign in to open this shared note — it will open right after you sign in", "neutral");
+  toast("Sign in to open this shared note. It will open right after you sign in", "neutral");
 }
 
 /**
@@ -1835,7 +1835,7 @@ function sameVault(get: () => AppStore, epoch: number | null | undefined): boole
 function rootCreateBlocked(get: () => AppStore, dir: string): boolean {
   if (dir !== "" || !get().rootFrozen) return false;
   toast(
-    "This vault's root is frozen — create this inside a folder instead.",
+    "This vault's root is frozen. Create this inside a folder instead.",
     "error",
   );
   return true;
@@ -2660,7 +2660,7 @@ export const useStore = create<AppStore>((set, get) => ({
           if (get().syncStatus === "synced" && !registerFailureToasted.has(path)) {
             registerFailureToasted.add(path);
             toast(
-              `"${title}" couldn't be registered for sync — ${
+              `"${title}" couldn't be registered for sync: ${
                 e instanceof Error ? e.message : String(e)
               }. It's saved on this device and will be retried.`,
               "error",
@@ -2779,7 +2779,7 @@ export const useStore = create<AppStore>((set, get) => ({
         // Actually signed out: put the sign-in dialog up. "unknown" stays
         // silent — initAuth resolves it either way and consumes the queue.
         set({ authPrompt: "note-link" });
-        toast("Sign in to open this shared note — it will open right after you sign in", "neutral");
+        toast("Sign in to open this shared note. It will open right after you sign in", "neutral");
       }
       return;
     }
@@ -2808,7 +2808,7 @@ export const useStore = create<AppStore>((set, get) => ({
       // consumes it, and dismissing the prompt drops it.
       queueNoteLink(url);
       toast(
-        `Choose a folder for “${pendingFolder.orgName}” — the shared note will open once it's set`,
+        `Choose a folder for “${pendingFolder.orgName}”. The shared note will open once it's set`,
         "neutral",
       );
       return;
@@ -2821,7 +2821,7 @@ export const useStore = create<AppStore>((set, get) => ({
     const progressTimer = setTimeout(() => {
       const name =
         get().organizations.find((o) => o.id === target.orgId)?.name ?? "the vault";
-      progressToastId = toast(`Opening shared note — syncing “${name}”…`, "neutral");
+      progressToastId = toast(`Opening shared note. Syncing “${name}”…`, "neutral");
     }, 1_000);
     const path = await waitForDocPath(target.docId, {
       isBusy: () => {
@@ -3421,7 +3421,7 @@ export const useStore = create<AppStore>((set, get) => ({
         const methods = await authManager.api.getAuthMethods();
         if (methods.passwordReset && session.user.emailVerified === false) {
           toast(
-            `Account created. We sent a confirmation email to ${session.user.email} — click its link to confirm your address.`,
+            `Account created. We sent a confirmation email to ${session.user.email}. Click its link to confirm your address.`,
             "neutral",
           );
         }
@@ -4289,7 +4289,7 @@ export const useStore = create<AppStore>((set, get) => ({
       }
       const session = await authManager.currentSession();
       if (session) set({ session });
-      toast("Email confirmed — thanks!", "success");
+      toast("Email confirmed. Thanks!", "success");
       return;
     }
     // "signin": a password reset in the browser revoked every session for that
@@ -4302,7 +4302,7 @@ export const useStore = create<AppStore>((set, get) => ({
     }
     if (get().authStatus === "signed-in") await get().signOut();
     set({ authPrompt: "sign-in" });
-    toast("Password updated — sign in with your new password.", "success");
+    toast("Password updated. Sign in with your new password.", "success");
   },
 
   handleBillingLink: async (orgId) => {
@@ -4334,7 +4334,7 @@ export const useStore = create<AppStore>((set, get) => ({
     // Paid, but the confirmation hasn't landed yet (provider still processing,
     // or a webhook on its way). Polling in the Upgrade dialog and the next
     // Billing visit pick it up; say so rather than nothing.
-    toast("Payment received — your subscription will show up in a moment.", "neutral");
+    toast("Payment received. Your subscription will show up in a moment.", "neutral");
   },
 
   removeMember: async (userId) => {
@@ -4966,7 +4966,7 @@ export const useStore = create<AppStore>((set, get) => ({
     const v = get().vault;
     const orgId = get().session?.activeOrganizationId ?? null;
     if (!v || !get().syncEnabled || !orgId) {
-      throw new Error("Only a synced vault can be reset — a local vault has no other copy.");
+      throw new Error("Only a synced vault can be reset. A local vault has no other copy.");
     }
     // Every tab names a file about to be deleted.
     get().closeAllTabs();

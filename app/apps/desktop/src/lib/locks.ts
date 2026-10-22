@@ -24,9 +24,9 @@ import { syncManager } from "./sync/docSession";
 export type LockScope = "all" | "vault" | "you" | "member";
 
 export const LOCK_TITLES: Record<LockScope, string> = {
-  all: "Locked for everyone — changes won't sync",
-  vault: "Everyone can only view this vault — changes won't sync",
-  you: "Locked for you — changes won't sync",
+  all: "Locked for everyone. Changes won't sync",
+  vault: "Everyone can only view this vault. Changes won't sync",
+  you: "Locked for you. Changes won't sync",
   member: "Locked for a member",
 };
 

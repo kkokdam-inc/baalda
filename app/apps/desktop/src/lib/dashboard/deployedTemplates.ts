@@ -5,7 +5,7 @@ import type { DashboardTemplate } from "./importedTemplates";
 export const DEPLOYED_OS_TEMPLATES: DashboardTemplate[] = [
   {
     id: "cosmos-agentic-os",
-    name: "Cosmos — Agentic OS",
+    name: "Cosmos: Agentic OS",
     category: "Agentic OS",
     palette: ["#5ee7ff", "#a78bfa", "#020714"],
     description: "An orbital knowledge graph with search, inspectors, briefing, radar, and a demo command console. Dark and light themes.",

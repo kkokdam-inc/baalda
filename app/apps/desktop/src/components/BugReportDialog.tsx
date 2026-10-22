@@ -230,7 +230,7 @@ export function BugReportDialog({ onClose }: { onClose: () => void }) {
                 <path d="M5 12.5l4.5 4.5L19 7.5" />
               </svg>
             </span>
-            <strong>Thanks — your report was sent.</strong>
+            <strong>Thanks, your report was sent.</strong>
             <p>
               {email ? (
                 <>Sent to support. Any reply will come to {email}.</>

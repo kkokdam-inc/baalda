@@ -47,8 +47,8 @@ const VAULT = "v-1";
 
 /** The server's answer to a move that would land at a frozen root. */
 function rootFrozen() {
-  return new ApiError(403, "This vault's root is frozen — create this inside a folder instead.", {
-    error: "This vault's root is frozen — create this inside a folder instead.",
+  return new ApiError(403, "This vault's root is frozen. Create this inside a folder instead.", {
+    error: "This vault's root is frozen. Create this inside a folder instead.",
     code: "root_frozen",
   });
 }
