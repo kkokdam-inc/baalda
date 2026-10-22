@@ -44,7 +44,7 @@ import type { ApiClient } from "../../api";
 import * as ipc from "../../ipc";
 import type { TreeNode } from "../../ipc";
 import { VaultRegistry } from "../registry";
-import { reconcileWithTree } from "./helpers/reconcile";
+import { fullTree, reconcileWithTree } from "./helpers/reconcile";
 
 const ORG = "org-1";
 const COLLECTION = "col-1";
@@ -220,5 +220,48 @@ describe("reconcile — the index's title rows are read on demand", () => {
     // Once, not twice: the inbound pass and the registry creation pass share
     // the memoized read.
     expect(ipc.listNoteTitles).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("reconcile — a primed collection id starts the network before the disk walk", () => {
+  it("lists the collections and its registry while the full tree is still being read", async () => {
+    const { api } = fakeApi([{ id: "n1", rel_path: "a.md" }]);
+    vi.mocked(ipc.getVaultConfig).mockResolvedValue(config({ "a.md": "n1" }));
+    const reg = new VaultRegistry(api);
+    expect(await reg.primeLocal(ORG)).toBe(true);
+
+    let release!: () => void;
+    const walked = new Promise<void>((r) => {
+      release = r;
+    });
+    vi.mocked(ipc.listTree).mockImplementation(async () => {
+      await walked;
+      return fullTree(treeWith(["a.md"]));
+    });
+    const running = reg.reconcile({ organizationId: ORG, vaultName: "vault" });
+    await new Promise((r) => setTimeout(r, 0));
+
+    // The walk is parked, yet both requests are already in flight.
+    expect(api.listVaults).toHaveBeenCalledTimes(1);
+    expect(api.listNoteRegistryPaged).toHaveBeenCalledWith(COLLECTION, expect.anything());
+    release();
+    await running;
+    // The prefetch was consumed, not repeated.
+    expect(api.listVaults).toHaveBeenCalledTimes(1);
+    expect(api.listNoteRegistryPaged).toHaveBeenCalledTimes(1);
+    expect(reg.getMapping("a.md")?.docId).toBe("n1");
+  });
+
+  it("falls back to a fresh collection list when the early one fails", async () => {
+    const { api } = fakeApi([{ id: "n1", rel_path: "a.md" }]);
+    vi.mocked(api.listVaults).mockRejectedValueOnce(new Error("offline for a moment"));
+    vi.mocked(ipc.getVaultConfig).mockResolvedValue(config({ "a.md": "n1" }));
+    const reg = new VaultRegistry(api);
+    expect(await reg.primeLocal(ORG)).toBe(true);
+
+    await reconcileWithTree(reg, { organizationId: ORG, vaultName: "vault" }, treeWith(["a.md"]));
+
+    expect(api.listVaults).toHaveBeenCalledTimes(2);
+    expect(reg.getMapping("a.md")?.docId).toBe("n1");
   });
 });
