@@ -248,14 +248,13 @@ export interface SyncProgress {
   /**
    * New notes/folders the server refused for access and that stay refused until
    * access changes (`VaultRegistry.heldRefusals`). Stamped on an `error`
-   * emission only. Unlike an ordinary failed note, these keep the pill from
-   * reading "Synced" (see `pillProgress`): nothing else would tell the user.
+   * emission only. The header pill does not report them (see `pillProgress`);
+   * the refusal banner does.
    */
   refused?: number;
   /**
    * The registry pull keeps failing (`SyncManager.pullFailure`), so no new note
-   * or folder can register. Stamped on an `error` emission only; like
-   * `refused`, it keeps the pill off "Synced".
+   * or folder can register. Stamped on an `error` emission only.
    */
   pullFailing?: boolean;
 }

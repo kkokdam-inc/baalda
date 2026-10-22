@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   isSyncRunActive,
-  syncBadgeAction,
   syncBadgeHold,
   syncBadgeLabel,
   syncBadgeTone,
@@ -46,16 +45,15 @@ describe("syncBadgeLabel", () => {
     );
   });
 
-  it("reads 'Retrying…' when the run errored only because the channel never connected", () => {
+  it("never reads 'Sync incomplete': a stopped run falls back to the connection", () => {
     const stalled: SyncProgress = { phase: "error", done: 0, total: 0, failed: 0 };
-    expect(syncBadgeLabel({ status: "connecting", now, progress: stalled })).toBe("Retrying…");
+    expect(syncBadgeLabel({ status: "connecting", now, progress: stalled })).toBe("Syncing…");
     expect(syncBadgeLabel({ status: "error", now, progress: stalled })).toBe("Retrying…");
-    // Failed NOTES are not a connectivity state: the pill reads Synced (see
-    // below); a connected channel with an errored run still reads incomplete.
     expect(
       syncBadgeLabel({ status: "synced", now, progress: { ...stalled, failed: 2 } }),
     ).toBe("Synced");
-    expect(syncBadgeLabel({ status: "synced", now, progress: stalled })).toBe("Sync incomplete");
+    expect(syncBadgeLabel({ status: "synced", now, progress: stalled })).toBe("Synced");
+    expect(syncBadgeTone({ status: "synced", progress: stalled })).toBe("synced");
   });
 
   it("shows Syncing… while local edits are pending, ignoring the timestamp", () => {
@@ -169,21 +167,12 @@ describe("syncBadgeLabel with a bulk sync run", () => {
     expect(syncBadgeTone({ status: "offline", noteOpen: false, progress: failedRun })).toBe(
       "synced",
     );
-    // …and it offers no button either.
-    expect(
-      syncBadgeAction({
-        running: false,
-        phase: failedRun.phase,
-        failed: failedRun.failed,
-        hasRetry: true,
-      }).kind,
-    ).toBe("none");
     // Genuine connectivity states still win over the settled run.
     expect(syncBadgeLabel({ status: "error", now, progress: failedRun })).toBe("Retrying…");
     expect(syncBadgeLabel({ status: "offline", now, progress: failedRun })).toBe("Offline");
     expect(
       syncBadgeLabel({ status: "synced", now, progress: run({ phase: "error" }) }),
-    ).toBe("Sync incomplete");
+    ).toBe("Synced");
   });
 
   it("goes back to the connection label once the run is done", () => {
@@ -211,7 +200,7 @@ describe("syncBadgeLabel with a bulk sync run", () => {
       "connecting",
     );
     expect(syncBadgeTone({ status: "synced", progress: run({ phase: "error" }) })).toBe(
-      "error",
+      "synced",
     );
     expect(syncBadgeTone({ status: "synced", progress: run({ phase: "done" }) })).toBe(
       "synced",
@@ -307,40 +296,6 @@ describe("syncBadgeLabel with a bulk sync run", () => {
   });
 });
 
-/** What the pill offers after a run stops. Only a run that could not proceed
- *  (the channel never connected) offers anything: a retry. Failed notes
- *  never reach the pill. */
-describe("syncBadgeAction", () => {
-  const base = { running: false, hasRetry: true };
-
-  it("offers nothing for a run that ended with failed notes (the pill reads Synced)", () => {
-    expect(syncBadgeAction({ ...base, phase: "error", failed: 12 })).toEqual({
-      kind: "none",
-      cta: "",
-    });
-  });
-
-  it("offers 'Sync now' when the run could not proceed", () => {
-    const a = syncBadgeAction({ ...base, phase: "error", failed: 0 });
-    expect(a).toEqual({ kind: "retry", cta: "Sync now", title: "Click to sync now" });
-  });
-
-  it("offers nothing while a run is live, or on any non-terminal phase", () => {
-    expect(syncBadgeAction({ ...base, running: true, phase: "error" }).kind).toBe("none");
-    for (const phase of ["idle", "registering", "uploading", "downloading", "done"]) {
-      expect(syncBadgeAction({ ...base, phase }).kind).toBe("none");
-    }
-    expect(syncBadgeAction({ ...base, phase: null }).kind).toBe("none");
-  });
-
-  it("offers nothing when the caller gave no action at all", () => {
-    expect(
-      syncBadgeAction({ running: false, phase: "error", hasRetry: false })
-        .kind,
-    ).toBe("none");
-  });
-});
-
 // #273: a vault-wide hold outranks every per-note/per-run state, in every badge
 // that renders through SyncBadge — Vault Settings once read "Synced · 9m ago"
 // while the tab-bar pill said "Sync paused".
@@ -374,57 +329,32 @@ describe("syncBadgeHold", () => {
   });
 });
 
-// New notes the server refused for access stay local until access changes, and
-// a refused create may or may not have been re-asked (and so counted as
-// `failed`) in the run that just ended. Either way the pill must not read
-// "Synced" over them.
-describe("a run with held create refusals", () => {
+// Held create refusals and a failing registry pull have their own surfaces
+// (the refusal banner, the sidebar's vault badge, Activity). The header pill
+// no longer reports them: it never reads "Sync incomplete" and offers no
+// "Sync now" action, falling back to the open note's connection instead.
+describe("a stopped run with refusals or a failing pull", () => {
   const now = 1_000_000_000_000;
-  const asked: SyncProgress = { phase: "error", done: 3, total: 3, failed: 2, refused: 2 };
-  const skipped: SyncProgress = { phase: "error", done: 0, total: 0, failed: 0, refused: 2 };
+  const runs: SyncProgress[] = [
+    { phase: "error", done: 3, total: 3, failed: 2, refused: 2 },
+    { phase: "error", done: 0, total: 0, failed: 0, refused: 2 },
+    { phase: "error", done: 3, total: 3, failed: 2, pullFailing: true },
+    { phase: "error", done: 0, total: 0, failed: 0, pullFailing: true },
+  ];
 
-  it("reads the same whether or not the refusals were re-asked this run", () => {
-    for (const progress of [asked, skipped]) {
-      expect(syncBadgeLabel({ status: "synced", now, progress })).toBe("Sync incomplete");
-      expect(syncBadgeTone({ status: "synced", progress })).toBe("error");
-      expect(
-        syncBadgeAction({ running: false, phase: "error", failed: progress.failed, refused: 2, hasRetry: true }).kind,
-      ).toBe("retry");
+  it("reads the connection's label, never Sync incomplete", () => {
+    for (const progress of runs) {
+      expect(syncBadgeLabel({ status: "synced", now, progress, lastSyncedAt: now })).toBe("Synced · just now");
+      expect(syncBadgeLabel({ status: "synced", now, progress })).not.toBe("Sync incomplete");
+      expect(syncBadgeTone({ status: "synced", progress })).toBe("synced");
+      expect(syncBadgeLabel({ status: "offline", now, noteOpen: false, progress })).toBe("Synced");
     }
   });
 
-  it("still reads Synced for ordinary failed notes", () => {
-    const progress: SyncProgress = { phase: "error", done: 3, total: 3, failed: 2 };
-    expect(syncBadgeLabel({ status: "synced", now, progress, lastSyncedAt: now })).toBe("Synced · just now");
-  });
-});
-
-// A registry pull that keeps failing strands every new note and folder, so the
-// pill must not read "Synced" over it — even when the run also had ordinary
-// failed notes, which on their own read "Synced".
-describe("a run whose registry pull keeps failing", () => {
-  const now = 1_000_000_000_000;
-  const withFailed: SyncProgress = { phase: "error", done: 3, total: 3, failed: 2, pullFailing: true };
-  const alone: SyncProgress = { phase: "error", done: 0, total: 0, failed: 0, pullFailing: true };
-
-  it("reads Sync incomplete and offers a retry", () => {
-    for (const progress of [withFailed, alone]) {
-      expect(syncBadgeLabel({ status: "synced", now, progress })).toBe("Sync incomplete");
-      expect(syncBadgeTone({ status: "synced", progress })).toBe("error");
-      expect(
-        syncBadgeAction({
-          running: false,
-          phase: "error",
-          failed: progress.failed,
-          pullFailing: true,
-          hasRetry: true,
-        }).kind,
-      ).toBe("retry");
+  it("still lets a grant fact about the open note win", () => {
+    for (const progress of runs) {
+      expect(syncBadgeLabel({ status: "read-only", now, progress })).toBe("Read-only");
+      expect(syncBadgeTone({ status: "read-only", progress })).toBe("read-only");
     }
-  });
-
-  it("reads Synced again once the stamp is gone", () => {
-    const progress: SyncProgress = { phase: "error", done: 3, total: 3, failed: 2 };
-    expect(syncBadgeLabel({ status: "synced", now, progress, lastSyncedAt: now })).toBe("Synced · just now");
   });
 });

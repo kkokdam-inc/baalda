@@ -1013,9 +1013,6 @@ function SyncIndicator({
       noteOpen={noteOpen}
       rootMissing={rootMissing}
       pause={syncPause}
-      // A run that could not proceed carries its own remedy: one click re-pulls
-      // the registry and re-runs the content pass for everything unconfirmed.
-      onRetry={syncEnabled ? () => void syncManager.retrySync() : undefined}
     />
   );
 }
