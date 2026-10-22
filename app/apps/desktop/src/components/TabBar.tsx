@@ -246,7 +246,7 @@ export function TabBar() {
       {/* Escape the strip's fade mask so the menu can extend below the tabs. */}
       {menu && createPortal(
         <ul
-          className="context-menu"
+          className="context-menu menu-portal"
           role="menu"
           aria-label={`Tab actions for ${menuLabel}`}
           ref={menuRef}
