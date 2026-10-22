@@ -96,7 +96,7 @@ const isNotCreatorReason = (reason: unknown) =>
 
 /** Tooltip on every root-create affordance while the vault's root is frozen. */
 const ROOT_FROZEN_HINT =
-  "This vault's root is frozen — new notes and folders go inside a folder.";
+  "This vault's root is frozen. New notes and folders go inside a folder.";
 
 interface Dimensions {
   width: number;
@@ -676,8 +676,8 @@ export function FileTree() {
     } else if (failed.length > 0) {
       toast(
         failed.length === 1
-          ? `Couldn't delete "${failed[0].path}" — ${failed[0].reason}`
-          : `Couldn't delete ${failed.length} items — ${failed[0].reason}`,
+          ? `Couldn't delete "${failed[0].path}": ${failed[0].reason}`
+          : `Couldn't delete ${failed.length} items: ${failed[0].reason}`,
         "error",
       );
     }
@@ -1138,7 +1138,7 @@ export function FileTree() {
     // Reordering things already at the root is fine — the shape doesn't change.
     if (destDir === "" && rootFrozen && dragIds.some((p) => p.includes("/"))) {
       toast(
-        "This vault's root is frozen — drop this inside a folder.",
+        "This vault's root is frozen. Drop this inside a folder.",
         "error",
       );
       return;
@@ -1547,7 +1547,7 @@ export function FileTree() {
   function rootBlocked(dir: string): boolean {
     if (dir !== "" || !rootFrozen) return false;
     toast(
-      "This vault's root is frozen — create this inside a folder instead.",
+      "This vault's root is frozen. Create this inside a folder instead.",
       "error",
     );
     return true;
@@ -1593,7 +1593,7 @@ export function FileTree() {
       toast(NOT_CREATOR_MESSAGE, "error");
     } else if (failed.length > 0) {
       toast(
-        `Couldn't delete "${failed[0].path}" — ${failed[0].reason}`,
+        `Couldn't delete "${failed[0].path}": ${failed[0].reason}`,
         "error",
       );
     }
@@ -2122,7 +2122,7 @@ export function FileTree() {
               <li
                 className="disabled"
                 aria-disabled="true"
-                title="Everyone can only view this vault — change it in Members and access"
+                title="Everyone can only view this vault. Change it in Members and access"
                 onClick={(e) => e.stopPropagation()}
               >
                 Locked by the vault

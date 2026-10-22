@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import * as ipc from "../lib/ipc";
 import { useStore } from "../store";
 import { effectiveHomeNote } from "../lib/pins";
-import { effectiveLockForPath, lockScopesByPath } from "../lib/locks";
+import { lockBlocksCaller, lockScopesByPath } from "../lib/locks";
 import { createDashboardBridge, dashboardUrl, DASHBOARD_PROTOCOL } from "../lib/dashboard/bridge";
 import { dashboardHost, pushDashboardTheme } from "../lib/dashboard/host";
 import { DashboardHeaderActionsContext } from "./DashboardHeaderActions";
@@ -53,7 +53,7 @@ export function HtmlView({ path }: { path: string }) {
   dirtyRef.current = dirty;
   const docId = titles.find((note) => note.path === path)?.id;
   const epoch = vault?.epoch;
-  const readOnly = Boolean(effectiveLockForPath(lockScopesByPath(tree, locks, userId, lifts), path)) || ["read-only", "no-access", "deleted"].includes(String(docId ? state[docId] : ""));
+  const readOnly = lockBlocksCaller(lockScopesByPath(tree, locks, userId, lifts), path) || ["read-only", "no-access", "deleted"].includes(String(docId ? state[docId] : ""));
   useEffect(() => {
     setLease(null);
     if (epoch == null || mode !== "preview") return;

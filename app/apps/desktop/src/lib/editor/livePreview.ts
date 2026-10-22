@@ -35,7 +35,7 @@
 import { onAttachmentArrived, wantAttachment } from "../attachmentArrivals";
 import { openImageLightbox } from "../imageLightbox";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
-import { type EditorState, StateField } from "@codemirror/state";
+import { type EditorState, Facet, StateField } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -55,7 +55,8 @@ import {
   parseImageAlt,
   planImageWidthChange,
 } from "./imageSize";
-import { frontmatterField } from "./frontmatter";
+import { frontmatterField, frontmatterView } from "./frontmatter";
+import { bodyStart } from "./headerFocus";
 import { MermaidWidget } from "./mermaid/MermaidWidget";
 import { CALLOUT_RE } from "./ofm/callout";
 import {
@@ -508,7 +509,7 @@ class CsvEmbedWidget extends WidgetType {
     if (truncatedRows || truncatedCols) {
       const footer = document.createElement("div");
       footer.className = "cm-md-csv-note";
-      footer.textContent = `Showing the first ${body.length} rows — open the file for the rest`;
+      footer.textContent = `Showing the first ${body.length} rows. Open the file for the rest`;
       wrap.appendChild(footer);
     }
   }
@@ -687,6 +688,59 @@ function redundantInlineTitleRange(
   const heading = match[1].replace(/[\t ]+#+[\t ]*$/, "");
   if (heading !== inlineTitle) return null;
   return [line.from, line.to];
+}
+
+/** The filename stem live preview compares a first H1 against, so readers
+ *  outside this module (the initial caret, peers' carets) ask the same question. */
+const inlineTitleFacet = Facet.define<string | undefined, string | undefined>({
+  combine: (values) => values[0],
+});
+
+/**
+ * Where `pos` shows up on screen, given what the header hides: presentation-
+ * hidden frontmatter (the Properties panel or its collapsed form) and the
+ * duplicate first H1. A position inside either has no line of its own, so
+ * `coordsAtPos` answers with the replaced block's edge, at the far left of the
+ * pane. Those positions move to the first visible body position after them;
+ * any other position is returned as is, and `null` means nothing after it is
+ * visible (a note that is only its duplicate heading).
+ *
+ * `ignoreCaret` asks about the note at rest — the duplicate counts as hidden
+ * even while the local caret sits on it and reveals it. That is what the
+ * opening caret needs: placed by this, it never reveals the line to begin with.
+ */
+export function visibleBodyPos(
+  state: EditorState,
+  pos: number,
+  opts: { ignoreCaret?: boolean } = {},
+): number | null {
+  const len = state.doc.length;
+  const fm = state.field(frontmatterField, false) ?? null;
+  const fmView = frontmatterView(state);
+  if (fm && (fmView === "panel" || fmView === "collapsed") && pos <= fm.to) {
+    pos = bodyStart(fm, len);
+    if (pos <= fm.to) return null;
+  }
+  const dup = redundantInlineTitleRange(state, state.facet(inlineTitleFacet));
+  if (!dup || pos < dup[0] || pos > dup[1]) return pos;
+  const hidden =
+    opts.ignoreCaret || state.readOnly || !activeLineChecker(state)(dup[0], dup[1]);
+  if (!hidden) return pos;
+  return dup[1] < len ? dup[1] + 1 : null;
+}
+
+/**
+ * Where a freshly opened note's caret belongs, or `null` to leave it. A new
+ * view's caret sits at 0, which for a note whose first line is the duplicate
+ * H1 is ON that line: the first focus then revealed `# Title` under the inline
+ * title until the first click moved the caret away. Only a lone empty caret is
+ * moved, and only off something hidden (cf. `clampSelectionToBody`).
+ */
+export function openingCaret(state: EditorState): number | null {
+  const sel = state.selection;
+  if (sel.ranges.length !== 1 || !sel.main.empty) return null;
+  const pos = visibleBodyPos(state, sel.main.head, { ignoreCaret: true });
+  return pos == null || pos === sel.main.head ? null : pos;
 }
 
 function buildBlockDecorations(
@@ -1085,5 +1139,5 @@ export function livePreview(
     }
   );
 
-  return [...revealState, blockWidgets, inlinePlugin];
+  return [...revealState, inlineTitleFacet.of(inlineTitle), blockWidgets, inlinePlugin];
 }

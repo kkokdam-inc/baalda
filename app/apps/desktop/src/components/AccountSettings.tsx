@@ -352,7 +352,7 @@ function ProfileTab() {
         )}
         {session.user.emailVerified === false && (
           <span className="field-hint">
-            Not confirmed yet — check your inbox for the confirmation email.{" "}
+            Not confirmed yet. Check your inbox for the confirmation email.{" "}
             <button
               type="button"
               className="linkish"
@@ -633,7 +633,7 @@ export function ConnectionTab() {
   const save = async () => {
     const url = normalizeServerUrl(draft);
     if (!url) {
-      setError("That doesn't look like a server address — try https://notes.example.com");
+      setError("That doesn't look like a server address. Try https://notes.example.com");
       return;
     }
     setBusy(true);
@@ -727,7 +727,7 @@ export function ConnectionTab() {
           autoCapitalize="off"
         />
         <span className="field-hint">
-          The Baalda server this device syncs against — currently{" "}
+          The Baalda server this device syncs against, currently{" "}
           <strong>{serverHost(serverUrl)}</strong>. Use the managed service or
           point at your own. Your account is per-server, so switching signs you
           in to that server's session instead.
@@ -781,19 +781,19 @@ function AboutTab({ onClose }: { onClose: () => void }) {
       statusText = "You're on the latest version.";
       break;
     case "available":
-      statusText = `Version ${update.version} found — starting the download…`;
+      statusText = `Version ${update.version} found. Starting the download…`;
       break;
     case "downloading":
       statusText =
         update.total > 0
-          ? `Downloading ${update.version} — ${Math.round((update.downloaded / update.total) * 100)}%`
+          ? `Downloading ${update.version}: ${Math.round((update.downloaded / update.total) * 100)}%`
           : `Downloading ${update.version}…`;
       break;
     case "installing":
       statusText = `Installing ${update.version}…`;
       break;
     case "ready":
-      statusText = `Version ${update.version} is installed — restarting shortly.`;
+      statusText = `Version ${update.version} is installed. Restarting shortly.`;
       break;
     case "pending":
       // The server already runs a newer release than the feed can serve yet;

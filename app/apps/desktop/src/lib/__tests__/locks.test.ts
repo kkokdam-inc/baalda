@@ -27,6 +27,7 @@ import {
   hasVaultLock,
   itemLockRows,
   LOCK_TITLES,
+  lockBlocksCaller,
   lockScopesByPath,
 } from "../locks";
 
@@ -125,7 +126,7 @@ describe("lockScopesByPath", () => {
   });
 
   it("gives the vault scope its own tooltip, naming the vault rather than the item", () => {
-    expect(LOCK_TITLES.vault).toBe("Everyone can only view this vault — changes won't sync");
+    expect(LOCK_TITLES.vault).toBe("Everyone can only view this vault. Changes won't sync");
     expect(LOCK_TITLES.vault).not.toBe(LOCK_TITLES.all);
   });
 
@@ -296,6 +297,92 @@ describe("effectiveLockForPath", () => {
     expect(effectiveLockForPath(map, "Projects/Deep/buried.md")).toBe("all");
     // Outside that folder the vault is still the only thing deciding.
     expect(effectiveLockForPath(map, "loose.md")).toBe("vault");
+  });
+
+  // Members & Access: Can view on a parent folder, Can edit on one subfolder,
+  // in a Shared vault. Among one person's rows the deepest wins on the server,
+  // so the subfolder must not inherit the parent's "you" padlock.
+  const myViewOnProjects = () =>
+    share({
+      id: "mine",
+      resourceType: "folder",
+      resourceId: "f-projects",
+      principalType: "user",
+      principalId: "u1",
+      permission: "locked",
+    });
+
+  it("lets the caller's own deeper edit row lift their own ancestor lock", () => {
+    const map = lockScopesByPath(tree, [myViewOnProjects()], "u1", [
+      lift("folder", "f-deep", { type: "user", id: "u1" }),
+    ]);
+    expect(effectiveLockForPath(map, "Projects/Deep")).toBeNull();
+    expect(effectiveLockForPath(map, "Projects/Deep/buried.md")).toBeNull();
+    // The rest of the parent folder stays view-only.
+    expect(effectiveLockForPath(map, "Projects")).toBe("you");
+    expect(effectiveLockForPath(map, "Projects/alpha.md")).toBe("you");
+  });
+
+  it("a per-user file edit row lifts just that note out of the caller's folder lock", () => {
+    const map = lockScopesByPath(tree, [myViewOnProjects()], "u1", [
+      lift("file", "n-alpha", { type: "user", id: "u1" }),
+    ]);
+    expect(effectiveLockForPath(map, "Projects/alpha.md")).toBeNull();
+    expect(effectiveLockForPath(map, "Projects/Deep/buried.md")).toBe("you");
+  });
+
+  it("does not let a personal lift override an Everyone lock or another person's grant", () => {
+    const everyone = lockScopesByPath(
+      tree,
+      [share({ resourceType: "folder", resourceId: "f-projects" })],
+      "u1",
+      [lift("folder", "f-deep", { type: "user", id: "u1" })],
+    );
+    expect(effectiveLockForPath(everyone, "Projects/Deep/buried.md")).toBe("all");
+
+    const someoneElse = lockScopesByPath(tree, [myViewOnProjects()], "u1", [
+      lift("folder", "f-deep", { type: "user", id: "u2" }),
+    ]);
+    expect(effectiveLockForPath(someoneElse, "Projects/Deep/buried.md")).toBe("you");
+  });
+
+  it("a deeper own lock under the caller's edit row still applies", () => {
+    const map = lockScopesByPath(
+      tree,
+      [share({ id: "deep", resourceType: "folder", resourceId: "f-deep", principalType: "user", principalId: "u1" })],
+      "u1",
+      [lift("folder", "f-projects", { type: "user", id: "u1" })],
+    );
+    expect(effectiveLockForPath(map, "Projects/Deep/buried.md")).toBe("you");
+    expect(effectiveLockForPath(map, "Projects/alpha.md")).toBeNull();
+  });
+});
+
+describe("lockBlocksCaller", () => {
+  const userRow = (resourceId: string, userId: string) =>
+    share({ id: `u-${resourceId}-${userId}`, resourceType: "folder", resourceId, principalType: "user", principalId: userId });
+
+  it("never makes the caller read-only on another member's row (badge only)", () => {
+    const map = lockScopesByPath(tree, [userRow("f-projects", "u2")], "u1");
+    expect(effectiveLockForPath(map, "Projects/alpha.md")).toBe("member");
+    expect(lockBlocksCaller(map, "Projects/alpha.md")).toBe(false);
+    expect(lockBlocksCaller(map, "Projects/Deep/buried.md")).toBe(false);
+  });
+
+  it("blocks on the caller's own row, an Everyone lock and the vault posture", () => {
+    expect(lockBlocksCaller(lockScopesByPath(tree, [userRow("f-projects", "u1")], "u1"), "Projects/alpha.md")).toBe(true);
+    expect(
+      lockBlocksCaller(
+        lockScopesByPath(tree, [share({ resourceType: "folder", resourceId: "f-projects" })], "u1"),
+        "Projects/alpha.md",
+      ),
+    ).toBe(true);
+    expect(lockBlocksCaller(lockScopesByPath(tree, [vaultLock()], "u1"), "loose.md")).toBe(true);
+  });
+
+  it("still blocks when the caller's own lock sits above another member's", () => {
+    const map = lockScopesByPath(tree, [userRow("f-projects", "u1"), userRow("f-deep", "u2")], "u1");
+    expect(lockBlocksCaller(map, "Projects/Deep/buried.md")).toBe(true);
   });
 });
 

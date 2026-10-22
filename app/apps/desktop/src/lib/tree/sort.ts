@@ -28,7 +28,7 @@ export const TREE_SORTS: Array<{ id: TreeSort; label: string; hint: string }> = 
   {
     id: "name-desc",
     label: "Name (Z–A)",
-    hint: "Reverse alphabetical — dated notes like 2026-09-23 newest first",
+    hint: "Reverse alphabetical: dated notes like 2026-09-23 newest first",
   },
 ];
 

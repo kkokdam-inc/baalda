@@ -204,7 +204,7 @@ describe("runCheckAction", () => {
     const out = await runCheckAction(p, d);
     expect(out.cancelled).toBe(true);
     expect(d.exportTo).not.toHaveBeenCalled();
-    expect(outcomeSummary(out, p)).toBe("Cancelled — nothing changed");
+    expect(outcomeSummary(out, p)).toBe("Cancelled. Nothing changed");
   });
 
   it("exports every copy into the chosen folder without overwriting one", async () => {
@@ -250,7 +250,7 @@ describe("runCheckAction", () => {
     expect(d.rename).toHaveBeenCalledWith("what?.md", "what-.md");
     expect(out.done).toBe(1);
     expect(out.skipped.map((s) => s.reason)).toContain(
-      "this is a folder — rename it in the sidebar",
+      "this is a folder. Rename it in the sidebar",
     );
   });
 

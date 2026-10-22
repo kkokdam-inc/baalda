@@ -38,6 +38,9 @@ export interface McpAuth {
    * OAuth-authenticated requests (no token row exists for those).
    */
   tokenId?: string;
+  /** The OAuth client id when auth came from an OAuth access token; with the
+   *  user and vault it keys that connection (e.g. its rate-limit bucket). */
+  oauthClientId?: string;
 }
 
 function hashToken(token: string): string {

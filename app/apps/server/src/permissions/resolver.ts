@@ -269,30 +269,27 @@ export function createResolverCache(): ResolverCache {
       }
       const wanted = [...new Set(folderIds)].filter((id) => !index!.folders.has(id));
       // The same walk as `ancestorFolderIds` (parent_id, no vault filter), for
-      // every start folder at once. UNION: shared ancestors read once, a cycle
-      // ends (and `indexedAncestors` then reports it, so it resolves live).
-      const chain = wanted.length === 0
-        ? { rows: [] as Array<{ id: string; parent_id: string | null; vault_id: string; created_by: string | null; created_at: Date; organization_id: string | null }> }
-        : await db.query<{
-            id: string;
-            parent_id: string | null;
-            vault_id: string;
-            created_by: string | null;
-            created_at: Date;
-            organization_id: string | null;
-          }>(
-            `WITH RECURSIVE chain AS (
-                SELECT id FROM folders WHERE id = ANY($1::text[])
-                UNION
-                SELECT f.parent_id FROM folders f JOIN chain c ON f.id = c.id
-                 WHERE f.parent_id IS NOT NULL
-             )
-             SELECT f.id, f.parent_id, f.vault_id, f.created_by, f.created_at, v.organization_id
-               FROM folders f
-               JOIN chain c ON c.id = f.id
-               LEFT JOIN vaults v ON v.id = f.vault_id`,
-            [wanted],
-          );
+      // every start folder at once: each folder read once, a cycle ends (and
+      // `indexedAncestors` then reports it, so it resolves live).
+      const walked = await folderAncestry<{
+        id: string;
+        parent_id: string | null;
+        vault_id: string;
+        created_by: string | null;
+        created_at: Date;
+      }>(db, wanted, "f.id, f.parent_id, f.vault_id, f.created_by, f.created_at");
+      const vaultIds = [...new Set(walked.map((r) => r.vault_id))];
+      const orgOf = new Map<string, string>();
+      if (vaultIds.length > 0) {
+        const { rows: vrows } = await db.query<{ id: string; organization_id: string }>(
+          `SELECT id, organization_id FROM vaults WHERE id = ANY($1::text[])`,
+          [vaultIds],
+        );
+        for (const v of vrows) orgOf.set(v.id, v.organization_id);
+      }
+      const chain = {
+        rows: walked.map((r) => ({ ...r, organization_id: orgOf.get(r.vault_id) ?? null })),
+      };
       const fresh = chain.rows.filter((r) => !index!.folders.has(r.id));
       for (const r of fresh) {
         index.folders.set(r.id, { parentId: r.parent_id, vaultId: r.vault_id, createdAt: r.created_at });
@@ -689,18 +686,8 @@ async function prefetchDocs(db: Queryable, docIds: string[]): Promise<Map<string
   const startFolders = [...new Set(unique.map((r) => r.folder_id).filter((f): f is string => f !== null))];
   const parents = new Map<string, string | null>();
   if (startFolders.length > 0) {
-    // UNION, not UNION ALL: shared ancestors are read once, and a cycle ends.
-    const { rows } = await db.query<{ id: string; parent_id: string | null }>(
-      `WITH RECURSIVE chain AS (
-          SELECT id, parent_id FROM folders WHERE id = ANY($1::text[])
-          UNION
-          SELECT f.id, f.parent_id
-            FROM folders f
-            JOIN chain c ON f.id = c.parent_id
-       )
-       SELECT id, parent_id FROM chain`,
-      [startFolders],
-    );
+    // Shared ancestors are read once, and a cycle ends.
+    const rows = await folderAncestry<{ id: string; parent_id: string | null }>(db, startFolders, "f.id, f.parent_id");
     for (const r of rows) parents.set(r.id, r.parent_id);
   }
   // The same walk as `ancestorFolderIds`: the folder itself, then each parent
@@ -840,6 +827,42 @@ export async function memberAccessSnapshot(
         snapshotAt: row.snapshot_at,
       }
     : null;
+}
+
+/**
+ * Every existing folder reachable from `startIds` by following `parent_id`
+ * upward (the start folders included), each returned once.
+ *
+ * Read level by level, one `id = ANY(...)` primary-key lookup per level. The
+ * `WITH RECURSIVE` form it replaces gave Postgres no row estimate for the
+ * working table, so with a few hundred start ids it chose a hash join over a
+ * sequential scan of ALL folders (every vault) at EVERY level, and spilled it
+ * to disk. Same rows: a parent that has no row ends that chain, a folder
+ * already read is not read again (so a cycle ends), and like the old walk
+ * there is no vault filter. `columns` is a fixed list from this module, never
+ * caller input.
+ */
+export async function folderAncestry<R extends { id: string; parent_id: string | null }>(
+  db: Queryable,
+  startIds: Iterable<string>,
+  columns: string,
+): Promise<R[]> {
+  const out: R[] = [];
+  const asked = new Set<string>(startIds);
+  let frontier = [...asked];
+  while (frontier.length > 0) {
+    const { rows } = await db.query<R>(`SELECT ${columns} FROM folders f WHERE f.id = ANY($1::text[])`, [frontier]);
+    const next: string[] = [];
+    for (const r of rows) {
+      out.push(r);
+      if (r.parent_id !== null && !asked.has(r.parent_id)) {
+        asked.add(r.parent_id);
+        next.push(r.parent_id);
+      }
+    }
+    frontier = next;
+  }
+  return out;
 }
 
 /** Walk parent_id up from a folder, collecting all ancestor folder ids (inclusive). */

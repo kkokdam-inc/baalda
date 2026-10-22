@@ -159,7 +159,7 @@ describe("Member access board", () => {
     // ...then the truth.
     expect(names("readonly")).toContain("Welcome");
     expect(names("open")).not.toContain("Welcome");
-    expect(toast).toHaveBeenCalledWith("Couldn't apply — Welcome is still Can view", "error");
+    expect(toast).toHaveBeenCalledWith("Couldn't apply: Welcome is still Can view", "error");
     expect(toast).not.toHaveBeenCalledWith("Sara can now edit Welcome.");
   });
 
@@ -221,7 +221,7 @@ describe("Member access board", () => {
     await render();
     const welcome = row("readonly", "Welcome");
     expect(welcome.querySelector(".access-board-lock")?.getAttribute("title"))
-      .toBe("Read-only for everyone — moving to Can edit will ask to unlock");
+      .toBe("Read-only for everyone. Moving to Can edit will ask to unlock");
     expect(button("Move Welcome left").disabled).toBe(false);
     expect(button("Move Welcome right").disabled).toBe(false);
     const original = document.elementFromPoint;

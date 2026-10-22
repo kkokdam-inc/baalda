@@ -183,14 +183,14 @@ export async function resolveParentFolder(
     if (folder.vault_id !== vaultId) throw new TreeOpError("Folder is in a different vault");
     if (!samePath(folder.path, dir)) {
       throw new TreeOpError(
-        `"${relPath}" is not inside folder "${folder.path}" — use relPath "${folder.path}/${basename(relPath)}" or the folder whose path is "${dir}"`,
+        `"${relPath}" is not inside folder "${folder.path}". Use relPath "${folder.path}/${basename(relPath)}" or the folder whose path is "${dir}"`,
       );
     }
     return { folderId: folder.id, relPath: joinPath(folder.path, basename(relPath)) };
   }
   if (dir === "") return { folderId: null, relPath };
   const byPath = await byPathLookup(db, vaultId, dir);
-  if (!byPath) throw new TreeOpError(`No folder at "${dir}" — create it first`);
+  if (!byPath) throw new TreeOpError(`No folder at "${dir}". Create it first`);
   return { folderId: byPath.id, relPath: joinPath(byPath.path, basename(relPath)) };
 }
 
@@ -219,7 +219,7 @@ export async function resolveFolderParent(
   }
   if (dir === "") return { folderId: null, relPath: path };
   const byPath = await byPathLookup(db, vaultId, dir);
-  if (!byPath) throw new TreeOpError(`No folder at "${dir}" — create it first`);
+  if (!byPath) throw new TreeOpError(`No folder at "${dir}". Create it first`);
   return { folderId: byPath.id, relPath: joinPath(byPath.path, basename(path)) };
 }
 

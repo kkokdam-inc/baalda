@@ -140,7 +140,7 @@ function ShareNoteDialog({
       } else {
         await authManager.api.revokePublicLink(docId);
         setPublicLink(null);
-        toast("Public link turned off — the old link no longer works");
+        toast("Public link turned off. The old link no longer works");
       }
     } catch (e) {
       toast(

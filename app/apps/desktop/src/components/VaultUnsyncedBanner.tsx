@@ -38,7 +38,7 @@ export function VaultUnsyncedBannerView({
   return (
     <Banner show={show} className="not-syncing-banner" role="alert">
       <span>
-        <strong>This folder&apos;s synced vault wasn&apos;t found on this server</strong> — your
+        <strong>This folder&apos;s synced vault wasn&apos;t found on this server</strong>. Your
         notes are still here, but they no longer sync.
       </span>
       <div className="banner-actions">

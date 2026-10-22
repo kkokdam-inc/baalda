@@ -43,23 +43,23 @@ export const WELCOME_NOTE_PATH = "Welcome.md";
 export const STARTER_NOTES: ReadonlyArray<{ path: string; body: string }> = [
   {
     path: WELCOME_NOTE_PATH,
-    body: `Baalda is your **local-first second brain** — notes that live as plain Markdown files on your own computer.
+    body: `Baalda is your **local-first second brain**: notes that live as plain Markdown files on your own computer.
 
 What makes it different:
 
-- **Your files, your disk.** Every note is a real \`.md\` file in this folder. No lock-in — open them in any editor, back them up, sync them however you like.
-- **Write together, live.** Invite teammates and edit the same note at the same time, with cursors and presence — like a shared doc, but still just files.
+- **Your files, your disk.** Every note is a real \`.md\` file in this folder. No lock-in. Open them in any editor, back them up, sync them however you like.
+- **Write together, live.** Invite teammates and edit the same note at the same time, with cursors and presence. It works like a shared doc, but it's still just files.
 - **Your AI can edit too.** Connect an assistant like Claude and let it read and write these notes directly, right alongside you.
 
 Most tools give you one of these. Baalda is the bridge between all three.
 
 ## Start here
 
-- 🚀 [[How Baalda works]] — a two-minute tour of the essentials.
-- 🕸️ [[The graph view]] — see how these notes connect.
-- 🤖 \`AGENTS.md\` — how an AI assistant should work in this vault. Every folder has one too, listing what's inside.
+- 🚀 [[How Baalda works]]: a two-minute tour of the essentials.
+- 🕸️ [[The graph view]]: see how these notes connect.
+- 🤖 \`AGENTS.md\`: how an AI assistant should work in this vault. Every folder has one too, listing what's inside.
 
-> These starter notes are already linked together, which is why your graph isn't empty. Delete them whenever you like — this is your space.
+> These starter notes are already linked together, which is why your graph isn't empty. Delete them whenever you like. This is your space.
 
 Happy writing. ✍️
 `,
@@ -73,7 +73,7 @@ status: active
 tags: [meta, routing, guide]
 ---
 
-You are working in a Baalda vault: a folder of plain Markdown files that people and AI assistants read and edit together. Everything durable lives in these files, so whatever you write here becomes context for the next session — yours or a teammate's.
+You are working in a Baalda vault: a folder of plain Markdown files that people and AI assistants read and edit together. Everything durable lives in these files, so whatever you write here becomes context for the next session, yours or a teammate's.
 
 Core context:
 - Where to start: \`Welcome.md\`
@@ -94,7 +94,7 @@ Every piece of information needs one specific home. Do not create catch-all note
 | Working notes: projects, meetings, reading, reviews | \`Examples/\` | \`Examples/AGENTS.md\` |
 | A vault-wide rule for AI assistants | \`AGENTS.md\` (this file) | |
 
-The three folders above are a starter set. As the vault grows — \`Projects/\`, \`Meetings/\`, \`People/\`, whatever fits the work — give each new top-level folder its own \`AGENTS.md\` and a row in this table.
+The three folders above are a starter set. As the vault grows (\`Projects/\`, \`Meetings/\`, \`People/\`, whatever fits the work), give each new top-level folder its own \`AGENTS.md\` and a row in this table.
 
 ## Where Work Lands
 
@@ -115,7 +115,7 @@ The three folders above are a starter set. As the vault grows — \`Projects/\`,
 1. Search before creating. Duplicates are a vault's main failure mode. If a relevant note already exists, update it and say which note changed.
 2. One idea per note, titled so it can be linked later. Connect related notes with \`[[wikilinks]]\`: the other note's title in double square brackets.
 3. Read a note end to end before rewriting or restructuring it, or when the answer depends on what is missing from it.
-4. Put anything you will want to filter by — \`tags\`, \`status\`, a \`date\` — in the note's frontmatter properties.
+4. Put anything you will want to filter by (\`tags\`, \`status\`, a \`date\`) in the note's frontmatter properties.
 
 ## Working Alongside People
 
@@ -135,7 +135,7 @@ Match the length of a note to the task. Cover the substance without padding, fil
 
 ## Why AGENTS.md, Not CLAUDE.md
 
-\`AGENTS.md\` is the instructions file that Codex, Cursor and most other AI agents read, and Claude reads it too when there is no \`CLAUDE.md\` — so one file covers every assistant. If you only use Claude, you can name this file \`CLAUDE.md\` instead. If you also use Codex, Cursor or any other agent, keep \`AGENTS.md\`. Do not keep both with different rules: when a \`CLAUDE.md\` exists, Claude reads only that file. To have both, make \`CLAUDE.md\` the single line \`@AGENTS.md\`.
+\`AGENTS.md\` is the instructions file that Codex, Cursor and most other AI agents read, and Claude reads it too when there is no \`CLAUDE.md\`, so one file covers every assistant. If you only use Claude, you can name this file \`CLAUDE.md\` instead. If you also use Codex, Cursor or any other agent, keep \`AGENTS.md\`. Do not keep both with different rules: when a \`CLAUDE.md\` exists, Claude reads only that file. To have both, make \`CLAUDE.md\` the single line \`@AGENTS.md\`.
 `,
   },
 
@@ -170,21 +170,21 @@ How to use Baalda: the essentials, shortcuts, connecting an AI and working with 
   },
   {
     path: "Getting Started/How Baalda works.md",
-    body: `A quick tour of the essentials. This whole note is just a Markdown file — try editing it as you read.
+    body: `A quick tour of the essentials. This whole note is just a Markdown file. Try editing it as you read.
 
 ## 1. Everything is a file
 
-Notes are plain \`.md\` files in this folder. Create one with **⌘N**, then type its name straight into the title at the top — that *is* the file name, so renaming a note is just editing its title. Organise notes in the sidebar, and connect them with [[Wikilinks and backlinks]]. See [[Local-first notes]] for why that matters, and [[Keyboard shortcuts]] to move faster.
+Notes are plain \`.md\` files in this folder. Create one with **⌘N**, then type its name straight into the title at the top. That *is* the file name, so renaming a note is just editing its title. Organise notes in the sidebar, and connect them with [[Wikilinks and backlinks]]. See [[Local-first notes]] for why that matters, and [[Keyboard shortcuts]] to move faster.
 
-Want tags, a status or a date on a note? Press **⌘;** to add a **property** — it is stored as plain frontmatter at the top of the file and shown as a small panel above the text.
+Want tags, a status or a date on a note? Press **⌘;** to add a **property**. It is stored as plain frontmatter at the top of the file and shown as a small panel above the text.
 
 ## 2. Work together in real time
 
-This vault starts out **local** — just files on this computer. Sign in and turn on sync to keep it updated across your own devices, or accept a teammate's invite to collaborate on theirs — more in [[Collaborating with your team]].
+This vault starts out **local**: just files on this computer. Sign in and turn on sync to keep it updated across your own devices, or accept a teammate's invite to collaborate on theirs. More in [[Collaborating with your team]].
 
 ## 3. Bring in your AI
 
-Baalda speaks **MCP**, so an assistant like Claude can work in your vault directly — see [[Working with your AI]].
+Baalda speaks **MCP**, so an assistant like Claude can work in your vault directly. See [[Working with your AI]].
 
 When you're ready, open [[The graph view]] to see how everything connects.
 `,
@@ -209,7 +209,7 @@ When you're ready, open [[The graph view]] to see how everything connects.
 | Add a property (tags, dates…) | **⌘;** |
 | Insert a \`[[wikilink]]\` | type \`[[\` |
 
-Typing \`[[\` anywhere starts a link, \`#\` suggests tags you already use, and \`/\` at the start of a line opens the block menu. To rename a note, click its title at the top and type — the file follows.
+Typing \`[[\` anywhere starts a link, \`#\` suggests tags you already use, and \`/\` at the start of a line opens the block menu. To rename a note, click its title at the top and type, and the file follows.
 
 Hover the left edge of a heading, a list item or a callout for a › to fold it away; Baalda remembers what you folded the next time you open the note.
 
@@ -222,24 +222,24 @@ That's the core move behind [[Wikilinks and backlinks]]. Back to [[How Baalda wo
 
 1. Open **Vault Settings → MCP** and create a connection token.
 2. Add it to Claude as an MCP server.
-3. Ask Claude to search, summarise, and write notes — its edits appear here live, exactly the way a teammate's would (see [[Collaborating with your team]]).
+3. Ask Claude to search, summarise, and write notes. Its edits appear here live, exactly the way a teammate's would (see [[Collaborating with your team]]).
 
-You can also just open this folder in a coding assistant like Claude Code — files it writes here sync like any other edit.
+You can also just open this folder in a coding assistant like Claude Code. Files it writes here sync like any other edit.
 
-Every assistant should start from the \`AGENTS.md\` file at the root of the vault: it says where each kind of note belongs and how to keep the vault tidy. Each folder has its own \`AGENTS.md\` that indexes the notes inside it — keep them current as the vault grows, and your AI will always know where things go.
+Every assistant should start from the \`AGENTS.md\` file at the root of the vault: it says where each kind of note belongs and how to keep the vault tidy. Each folder has its own \`AGENTS.md\` that indexes the notes inside it. Keep them current as the vault grows, and your AI will always know where things go.
 
 Good first tasks: turn your [[Ideas inbox]] into [[Atomic notes]], or draft a [[Weekly review]]. Back to [[How Baalda works]].
 `,
   },
   {
     path: "Getting Started/Collaborating with your team.md",
-    body: `Turn on sync and this vault stops being local-only — it stays updated across your own devices and with everyone you invite, live.
+    body: `Turn on sync and this vault stops being local-only. It stays updated across your own devices and with everyone you invite, live.
 
 - Open the same note as a teammate and you'll see each other's cursors.
-- Edits **merge** in real time — nothing gets overwritten.
+- Edits **merge** in real time, so nothing gets overwritten.
 - Share a single folder or the whole vault; permissions are per-folder.
 
-Try it on [[Meeting notes]] or a [[Website launch]] plan. Your AI joins the same way — see [[Working with your AI]]. Back to [[How Baalda works]].
+Try it on [[Meeting notes]] or a [[Website launch]] plan. Your AI joins the same way. See [[Working with your AI]]. Back to [[How Baalda works]].
 `,
   },
 
@@ -252,7 +252,7 @@ status: active
 tags: [concepts, guide]
 ---
 
-Short explanations of one idea each — how notes, links and the graph fit together. Flat folder of atomic notes (no subfolders).
+Short explanations of one idea each: how notes, links and the graph fit together. Flat folder of atomic notes (no subfolders).
 
 ## Notes
 
@@ -275,35 +275,35 @@ Short explanations of one idea each — how notes, links and the graph fit toget
   },
   {
     path: "Concepts/Local-first notes.md",
-    body: `**Local-first** means the source of truth lives on *your* device, not a server. Your notes are plain \`.md\` files you fully own — they work offline, open in any editor, and sync only when you choose.
+    body: `**Local-first** means the source of truth lives on *your* device, not a server. Your notes are plain \`.md\` files you fully own. They work offline, open in any editor, and sync only when you choose.
 
 Syncing is additive, not a dependency: turn it on for [[Collaborating with your team]], turn it off and everything still works. This is the foundation the rest of [[How Baalda works]] builds on.
 `,
   },
   {
     path: "Concepts/Wikilinks and backlinks.md",
-    body: `A **wikilink** connects one note to another: write \`[[Atomic notes]]\` and it becomes a link. The note you link *to* automatically gains a **backlink** — a list of everything pointing at it.
+    body: `A **wikilink** connects one note to another: write \`[[Atomic notes]]\` and it becomes a link. The note you link *to* automatically gains a **backlink**: a list of everything pointing at it.
 
 Links are the real structure of a vault (folders are secondary). Enough of them and you get [[The graph view]], and you can curate them by hand with [[Maps of Content]]. This idea powers [[Atomic notes]] and [[Daily notes]].
 `,
   },
   {
     path: "Concepts/Maps of Content.md",
-    body: `A **Map of Content** (MOC) is a note that links to a cluster of related notes — a table of contents you write by hand. Use one whenever a topic grows past a few notes.
+    body: `A **Map of Content** (MOC) is a note that links to a cluster of related notes, a table of contents you write by hand. Use one whenever a topic grows past a few notes.
 
-They pair naturally with [[Wikilinks and backlinks]]: the MOC links out, the backlinks point home. Each folder's \`AGENTS.md\` index does a similar job for your AI — a table of everything in that folder. See also [[Atomic notes]].
+They pair naturally with [[Wikilinks and backlinks]]: the MOC links out, the backlinks point home. Each folder's \`AGENTS.md\` index does a similar job for your AI: a table of everything in that folder. See also [[Atomic notes]].
 `,
   },
   {
     path: "Concepts/Atomic notes.md",
-    body: `An **atomic note** holds *one* idea, titled so you can link to it later. Small notes recombine — one idea can support many others through [[Wikilinks and backlinks]].
+    body: `An **atomic note** holds *one* idea, titled so you can link to it later. Small notes recombine: one idea can support many others through [[Wikilinks and backlinks]].
 
 It's the core habit from [[How to Take Smart Notes]]. Capture rough thoughts in your [[Ideas inbox]] first, then split them into atomic notes. Gather related ones under [[Maps of Content]].
 `,
   },
   {
     path: "Concepts/Daily notes.md",
-    body: `A **daily note** is one page per day — a log, a scratchpad, a landing spot for whatever comes up. Link out from it liberally with [[Wikilinks and backlinks]].
+    body: `A **daily note** is one page per day: a log, a scratchpad, a landing spot for whatever comes up. Link out from it liberally with [[Wikilinks and backlinks]].
 
 Daily notes feed two rhythms: drop half-formed thoughts into your [[Ideas inbox]], and roll the week up in your [[Weekly review]].
 `,
@@ -351,20 +351,20 @@ Sample working notes that show how real work lives in a vault: reading, a book, 
     path: "Examples/Reading list.md",
     body: `A living list. Each book becomes its own note once you start taking [[Atomic notes]] from it.
 
-- 📖 [[How to Take Smart Notes]] — Sönke Ahrens *(reading)*
-- 📕 *Building a Second Brain* — Tiago Forte *(next)*
-- 📗 *How to Read a Book* — Adler & Van Doren *(someday)*
+- 📖 [[How to Take Smart Notes]] by Sönke Ahrens *(reading)*
+- 📕 *Building a Second Brain* by Tiago Forte *(next)*
+- 📗 *How to Read a Book* by Adler & Van Doren *(someday)*
 
 New ideas from what you read land in the [[Ideas inbox]].
 `,
   },
   {
     path: "Examples/How to Take Smart Notes.md",
-    body: `Notes on Sönke Ahrens' book — the case for the *Zettelkasten* method.
+    body: `Notes on Sönke Ahrens' book: the case for the *Zettelkasten* method.
 
 ## Key ideas
 
-- Write **[[Atomic notes]]** in your own words — one idea each.
+- Write **[[Atomic notes]]** in your own words, one idea each.
 - Link every note to others so ideas find each other later ([[Wikilinks and backlinks]]).
 - Don't file by folder; let structure emerge, then curate with [[Maps of Content]].
 
@@ -378,7 +378,7 @@ Part of the [[Reading list]].
 ## Milestones
 
 - [ ] Finalise copy
-- [ ] Design review — notes in [[Meeting notes]]
+- [ ] Design review (notes in [[Meeting notes]])
 - [ ] Ship 🚀
 
 Progress gets summarised in the [[Weekly review]]; coordinate with the team via [[Collaborating with your team]].
@@ -398,12 +398,12 @@ Progress gets summarised in the [[Weekly review]]; coordinate with the team via 
 - [ ] Capture leftover ideas in the [[Ideas inbox]]
 - [ ] Review progress in the [[Weekly review]]
 
-Everyone edits this live — see [[Collaborating with your team]].
+Everyone edits this live. See [[Collaborating with your team]].
 `,
   },
   {
     path: "Examples/Ideas inbox.md",
-    body: `A single place to dump raw thoughts fast, so nothing gets lost. Process it later into [[Atomic notes]] — that's the habit from [[How to Take Smart Notes]].
+    body: `A single place to dump raw thoughts fast, so nothing gets lost. Process it later into [[Atomic notes]]. That's the habit from [[How to Take Smart Notes]].
 
 - A graph filter for orphan notes?
 - Blog post: what "local-first" really means → [[Local-first notes]]

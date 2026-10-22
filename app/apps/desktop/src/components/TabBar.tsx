@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { LayoutGroup, motion, useReducedMotion } from "motion/react";
 import { placeMenu, type Placement } from "../lib/menuPlacement";
 import { noteLabel } from "../lib/notePath";
@@ -242,9 +243,10 @@ export function TabBar() {
         </svg>
       </button>
 
-      {menu && (
+      {/* Escape the strip's fade mask so the menu can extend below the tabs. */}
+      {menu && createPortal(
         <ul
-          className="context-menu"
+          className="context-menu menu-portal"
           role="menu"
           aria-label={`Tab actions for ${menuLabel}`}
           ref={menuRef}
@@ -299,7 +301,8 @@ export function TabBar() {
           >
             Close all
           </li>
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   );

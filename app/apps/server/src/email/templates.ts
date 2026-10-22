@@ -68,11 +68,11 @@ export function resetPasswordEmail(input: { to: string; url: string; validMinute
     `Choose a new password here (the link is valid for ${input.validMinutes} minutes):`,
     input.url,
     ``,
-    `If you didn't ask for this, you can ignore this email — your password stays as it is.`,
+    `If you didn't ask for this, you can ignore this email. Your password stays as it is.`,
   ].join("\n");
   const html = layout({
     title: "Reset your password",
-    intro: `Someone asked to reset the password for the ${esc(BRAND_NAME)} account <b>${esc(input.to)}</b>. Choose a new one below — the link is valid for ${input.validMinutes} minutes.`,
+    intro: `Someone asked to reset the password for the ${esc(BRAND_NAME)} account <b>${esc(input.to)}</b>. Choose a new one below. The link is valid for ${input.validMinutes} minutes.`,
     cta: "Choose a new password",
     url: input.url,
     outro: `If you didn't ask for this, you can ignore this email; your password stays as it is.`,
@@ -116,14 +116,14 @@ export function invitationEmail(input: {
     `Accept the invitation:`,
     input.url,
     ``,
-    `Sign in with ${input.to} — or create an account with that address — and you'll land in the vault.`,
+    `Sign in with ${input.to} (or create an account with that address) and you'll land in the vault.`,
     `This invitation expires ${expires}.`,
     ``,
     `Don't have ${BRAND_NAME} yet? Get it at https://baalda.com and then open the link again.`,
   ].join("\n");
   const html = layout({
     title: `Join ${esc(input.organizationName)}`,
-    intro: `<b>${esc(who)}</b> invited you to join the vault <b>${esc(input.organizationName)}</b> on ${esc(BRAND_NAME)}${esc(roleNote)}. Sign in with <b>${esc(input.to)}</b> — or create an account with that address — and you'll land in the vault.`,
+    intro: `<b>${esc(who)}</b> invited you to join the vault <b>${esc(input.organizationName)}</b> on ${esc(BRAND_NAME)}${esc(roleNote)}. Sign in with <b>${esc(input.to)}</b> (or create an account with that address) and you'll land in the vault.`,
     cta: "Accept invitation",
     url: input.url,
     outro: `This invitation expires ${esc(expires)}. Don't have ${esc(BRAND_NAME)} yet? <a href="https://baalda.com" style="color:#6b6b66;">Get it</a>, then open the link again.`,
@@ -154,12 +154,12 @@ export function invitationReminderEmail(input: {
     `Accept it before then:`,
     input.url,
     ``,
-    `Sign in with ${input.to} — or create an account with that address — and you'll land in the vault.`,
+    `Sign in with ${input.to} (or create an account with that address) and you'll land in the vault.`,
     `After it expires, ask ${askWho} to send a new one.`,
   ].join("\n");
   const html = layout({
     title: `Your invitation to ${esc(input.organizationName)} expires soon`,
-    intro: `<b>${esc(who)}</b> invited you to join the vault <b>${esc(input.organizationName)}</b> on ${esc(BRAND_NAME)}. Sign in with <b>${esc(input.to)}</b> — or create an account with that address — and you'll land in the vault.`,
+    intro: `<b>${esc(who)}</b> invited you to join the vault <b>${esc(input.organizationName)}</b> on ${esc(BRAND_NAME)}. Sign in with <b>${esc(input.to)}</b> (or create an account with that address) and you'll land in the vault.`,
     cta: "Accept invitation",
     url: input.url,
     outro: `This invitation expires ${esc(expires)}. After that, ask ${esc(askWho)} to send a new one.`,
@@ -208,12 +208,12 @@ export function youLeftVaultEmail(input: { to: string; organizationName: string 
     `It has been removed from your devices and you no longer have access to its notes.`,
     `To rejoin, ask the vault's owner for a new invitation or join code.`,
     ``,
-    `If you didn't do this, change your password right away — someone else may have access to your account.`,
+    `If you didn't do this, change your password right away. Someone else may have access to your account.`,
   ].join("\n");
   const html = layout({
     title: `You left ${esc(input.organizationName)}`,
     intro: `You left the vault <b>${esc(input.organizationName)}</b> on ${esc(BRAND_NAME)}. It has been removed from your devices and you no longer have access to its notes. To rejoin, ask the vault's owner for a new invitation or join code.`,
-    outro: `If you didn't do this, change your password right away — someone else may have access to your account.`,
+    outro: `If you didn't do this, change your password right away. Someone else may have access to your account.`,
   });
   return { to: input.to, subject, text, html };
 }
@@ -259,7 +259,7 @@ export function bugReportEmail(input: {
   <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
     <div style="font-weight:700;letter-spacing:0.18em;font-size:13px;color:#6b6b66;margin-bottom:18px;">${esc(BRAND_NAME.toUpperCase())} · BUG REPORT</div>
     <div style="background:#ffffff;border:1px solid #e6e5df;border-radius:14px;padding:26px 24px;">
-      <p style="font-size:13px;margin:0 0 14px;color:#6b6b66;">From ${esc(who)} — reply to this email to answer them.</p>
+      <p style="font-size:13px;margin:0 0 14px;color:#6b6b66;">From ${esc(who)}. Reply to this email to answer them.</p>
       <div style="font-size:15px;line-height:1.55;color:#1c1c1a;white-space:pre-wrap;">${esc(input.message)}</div>${
         input.videoUrl
           ? `

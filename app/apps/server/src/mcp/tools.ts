@@ -14,6 +14,8 @@ import {
   listFolders,
   listResourceAccessTool,
   listNotes,
+  LIST_NOTES_DEFAULT_PAGE,
+  LIST_NOTES_MAX_PAGE,
   listVaults,
   moveFolderTool,
   moveNoteTool,
@@ -334,17 +336,34 @@ export const TOOLS: McpTool[] = [
     name: "list_notes",
     annotations: { title: "List notes", ...READ },
     description:
-      "List notes you can access in a vault (optionally within one folder). Returns each note's docId, title, path and your permission.",
+      "List notes you can access in a vault (optionally within one folder or under a path prefix). Returns each note's docId, title, path and your permission. Prefer `limit` (e.g. 200) and then each `nextCursor` until it is null: a paged call is cheap, while listing the whole vault at once (no `limit`/`cursor`) is slow on large vaults and counts 20x against this connection's rate limit.",
     inputSchema: {
       type: "object",
       properties: {
         vaultId: S("Vault id from list_vaults"),
         folderId: S("Optional folder id to list only that folder's notes"),
+        pathPrefix: S(
+          "Optional: only notes whose relPath starts with this (case-sensitive), e.g. 'Projects/'",
+        ),
+        limit: {
+          type: "integer",
+          minimum: 1,
+          maximum: LIST_NOTES_MAX_PAGE,
+          description: `Optional page size (max ${LIST_NOTES_MAX_PAGE}). When set, the result is { results, nextCursor } instead of a bare list`,
+        },
+        cursor: S(
+          `Optional nextCursor from a previous list_notes call, to fetch the next page (page size defaults to ${LIST_NOTES_DEFAULT_PAGE})`,
+        ),
       },
       required: ["vaultId"],
       additionalProperties: false,
     },
-    handler: (ctx, a) => listNotes(ctx, reqStr(a, "vaultId"), optStr(a, "folderId")),
+    handler: (ctx, a) =>
+      listNotes(ctx, reqStr(a, "vaultId"), optStr(a, "folderId"), {
+        limit: optNum(a, "limit"),
+        cursor: optStr(a, "cursor"),
+        pathPrefix: optStr(a, "pathPrefix"),
+      }),
   },
   {
     name: "read_note",

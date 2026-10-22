@@ -14,9 +14,10 @@ import { ActivityFeed } from "./ActivityFeed";
 import { usePendingReviewCount } from "./ReviewTab";
 import { RIGHT_PANEL_TAB_LABEL, RIGHT_PANEL_TABS, type RightPanelTab } from "./rightPanelTab";
 
-/** Portaled UI the panel opens: ConfirmDialog (modal), RowActionsMenu
+/** The header toggles (`.panel-btn`, the Version history `.history-btn`) and
+ *  portaled UI the panel opens: ConfirmDialog (modal), RowActionsMenu
  *  (`.menu-portal`), toasts. A click there must not close the panel under it. */
-const PANEL_SPAWNED = ".panel-btn, .modal-backdrop, .modal, .menu-portal, .toast, .toast-viewport";
+const PANEL_SPAWNED = ".panel-btn, .history-btn, .modal-backdrop, .modal, .menu-portal, .toast, .toast-viewport";
 
 const ICON_PROPS = {
   viewBox: "0 0 24 24",

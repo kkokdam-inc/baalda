@@ -172,7 +172,7 @@ export function DashboardAgentRunner({ path, expectedEpoch, launchTarget, showLa
     }
   };
 
-  const launchButtons = (["claude", "codex"] as const).filter((agent) => path || (agent === selectedAgent && sessionPath)).map((agent) => <button key={agent} type="button" data-agent={agent} className={`ghost-pill sm dashboard-agent-launch${agent === selectedAgent && phase !== "idle" ? ` agent-launch-${phase}` : ""}`} aria-label={`Update with ${agent === "claude" ? "Claude" : "Codex"}${agent === selectedAgent && phase !== "idle" ? ` — ${phase === "success" ? "completed" : phase === "error" ? "failed" : phase}` : ""}`} title={agent === selectedAgent && sessionPath ? `${agent === "claude" ? "Claude" : "Codex"} · ${sessionPath}${phase !== "idle" ? ` · ${phase}` : ""}` : `Update with ${agent === "claude" ? "Claude" : "Codex"}`}
+  const launchButtons = (["claude", "codex"] as const).filter((agent) => path || (agent === selectedAgent && sessionPath)).map((agent) => <button key={agent} type="button" data-agent={agent} className={`ghost-pill sm dashboard-agent-launch${agent === selectedAgent && phase !== "idle" ? ` agent-launch-${phase}` : ""}`} aria-label={`Update with ${agent === "claude" ? "Claude" : "Codex"}${agent === selectedAgent && phase !== "idle" ? `: ${phase === "success" ? "completed" : phase === "error" ? "failed" : phase}` : ""}`} title={agent === selectedAgent && sessionPath ? `${agent === "claude" ? "Claude" : "Codex"} · ${sessionPath}${phase !== "idle" ? ` · ${phase}` : ""}` : `Update with ${agent === "claude" ? "Claude" : "Codex"}`}
       disabled={running && agent !== selectedAgent}
       onClick={(event) => {
         onOpen?.();
@@ -205,7 +205,7 @@ export function DashboardAgentRunner({ path, expectedEpoch, launchTarget, showLa
               <h2 id="dashboard-agent-title">Update with {agentName}</h2>
               <span className="dashboard-agent-path" title={sessionPath ?? undefined}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M14 3H5v18h14V8zm0 0v5h5" /></svg>{sessionPath?.split("/").pop()}</span>
             </div>
-            <button type="button" className="icon-btn" onClick={close} aria-label="Close agent dialog" title={running ? "Hide chat — update continues" : "Close"}>×</button>
+            <button type="button" className="icon-btn" onClick={close} aria-label="Close agent dialog" title={running ? "Hide chat (update continues)" : "Close"}>×</button>
           </div>
           <section className={`dashboard-agent-progress phase-${phase}`} aria-label="Update progress">
             <div className="dashboard-agent-status" role="status">

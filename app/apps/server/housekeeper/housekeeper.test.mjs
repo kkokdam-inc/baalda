@@ -126,6 +126,12 @@ test("resolution and retrieval respect paths, basenames, titles and lexical shor
   assert.equal(shortlist("Pricing strategy", "source", notes).length, 1);
   assert.equal(shortlist("Completely unrelated", "source", notes).length, 0);
 });
+test("resolution ignores Unicode normalization differences between links and paths (#332)", () => {
+  const nfd = s => s.normalize("NFD"), nfc = s => s.normalize("NFC");
+  assert.equal(resolves(nfc("Café"), [{ id: "a", path: nfd("Notes/Café.md"), title: nfd("Café") }]), true);
+  assert.equal(resolves(nfd("café"), [{ id: "b", path: nfc("Café.md"), title: "Other" }]), true);
+  assert.equal(resolves(nfc("Résumé"), [{ id: "c", path: "Cafe.md", title: "Cafe" }]), false);
+});
 test("both OpenRouter adapters select only allowed candidates", async () => {
   const candidates = [{ id: "note-id", path: "Pricing.md", title: "Pricing", excerpt: "text" }];
   let sent;

@@ -2170,7 +2170,7 @@ export class VaultRegistry {
       if (!firstTime) return "failed";
       f = {
         ...f,
-        reason: "deleted on the server by another member — kept on this device, no longer synced",
+        reason: "deleted on the server by another member. Kept on this device, no longer synced",
       };
     }
     const holdBase =
@@ -2206,7 +2206,7 @@ export class VaultRegistry {
     if (f.code === "root_frozen" && !frozenRootNotified.has(f.path)) {
       frozenRootNotified.add(f.path);
       toast(
-        `"${f.path}" can't sync — this vault's root is frozen. Move it into a folder to sync it.`,
+        `"${f.path}" can't sync. This vault's root is frozen. Move it into a folder to sync it.`,
         "error",
       );
     }
@@ -2422,7 +2422,7 @@ export class VaultRegistry {
         docId: gone.docId,
         code: null,
         reason:
-          "access was removed, but this device never confirmed its bytes upstream — left on disk",
+          "access was removed, but this device never confirmed its bytes upstream, so it was left on disk",
       });
       return false;
     }
@@ -2498,7 +2498,7 @@ export class VaultRegistry {
           kind: "trash",
           path: t.path,
           docId: t.docId,
-          reason: `refused: could not confirm the access change with the server (${reasonOf(e)}) — left on disk`,
+          reason: `refused: could not confirm the access change with the server (${reasonOf(e)}), so it was left on disk`,
         });
       }
       plan.trash = plan.trash.filter((t) => !(t.reason === "revoked" && asked.has(t.docId)));
@@ -2517,7 +2517,7 @@ export class VaultRegistry {
         path: t.path,
         docId: t.docId,
         reason:
-          "refused: the server listing omitted it but the resolver still grants access — left on disk",
+          "refused: the server listing omitted it but the resolver still grants access, so it was left on disk",
       });
     }
     if (disputed.length === 0) return;
@@ -2768,8 +2768,8 @@ export class VaultRegistry {
             this.recordFailure({
               kind: "orphan", path: gone.path, docId: gone.docId, code: null,
               reason: gone.reason === "revoked"
-                ? "access was removed, but this device never confirmed its content upstream — left on disk"
-                : "deleted on the server, but this device never confirmed its content — left on disk",
+                ? "access was removed, but this device never confirmed its content upstream, so it was left on disk"
+                : "deleted on the server, but this device never confirmed its content, so it was left on disk",
             });
             // Releasing the claim lets a file that is really a NEW note at this
             // path (re-imported under a fresh local id) register on a later
@@ -2803,8 +2803,8 @@ export class VaultRegistry {
               this.recordFailure({
                 kind: "orphan", path: gone.path, docId: gone.docId, code: null,
                 reason: gone.reason === "revoked"
-                  ? "access was removed while this device held unsent edits, and they could not be preserved — left on disk"
-                  : "deleted on the server while this device held unsent edits, and they could not be preserved — left on disk",
+                  ? "access was removed while this device held unsent edits, and they could not be preserved, so it was left on disk"
+                  : "deleted on the server while this device held unsent edits, and they could not be preserved, so it was left on disk",
               });
               // See the tombstone note on `baselineDocs` below: releasing the
               // claim keeps a re-imported NEW note at this path registrable.
@@ -2933,7 +2933,7 @@ export class VaultRegistry {
             path,
             docId,
             reason:
-              "deleted on the server but still on disk with content — re-registering it as a new local note",
+              "deleted on the server but still on disk with content, so it is being re-registered as a new local note",
             code: "resurrected_local_note",
           });
         }
@@ -3362,7 +3362,7 @@ export class VaultRegistry {
         this.aliasPaths.add(localPath);
         this.recordFailure({
           kind: "note", path: localPath, docId: null, code: null,
-          reason: "a teammate's note exists at the same path; too many such clashes at once to rename safely — left on disk, not synced",
+          reason: "a teammate's note exists at the same path; too many such clashes at once to rename safely, so it was left on disk and not synced",
         });
       }
       return held;
@@ -3416,7 +3416,7 @@ export class VaultRegistry {
         this.aliasPaths.add(localPath);
         this.recordFailure({
           kind: "note", path: localPath, docId: null, code: null,
-          reason: `a teammate's note was created at the same path and this one could not be renamed — left on disk, not synced (${reasonOf(e)})`,
+          reason: `a teammate's note was created at the same path and this one could not be renamed, so it was left on disk and not synced (${reasonOf(e)})`,
         });
       }
     }
@@ -3655,6 +3655,17 @@ export class VaultRegistry {
     // the window — dropping it loses a real fact about the server.
     this.checkpoint ?? this.newCheckpointer();
     this.sink.phase("registering", 0);
+    // When the prime already parsed the config, its collection id is known
+    // before the disk walk: start the listings and the collection list now so
+    // they fly alongside `readFullTree` instead of behind it. Consumed below only
+    // for that SAME id (`takeListings` checks it); a failure falls back to the
+    // ordinary request.
+    const earlyVaultId = this.primedConfig?.serverVaultId ?? null;
+    if (earlyVaultId) this.prefetchListings(earlyVaultId);
+    const earlyVaults = earlyVaultId ? this.api.listVaults() : null;
+    earlyVaults?.catch(() => {
+      /* re-requested at the await below */
+    });
     // Epoch-pinned like every other read here: a vault switch mid-walk makes Rust
     // reject it, which `stale()` then turns into a clean drop.
     const tree = await this.readFullTree();
@@ -3681,7 +3692,9 @@ export class VaultRegistry {
     // Start the listings for the id we already believe in, so they fly alongside
     // the validation rather than behind it. See `prefetchedListings`.
     if (cfg.serverVaultId) this.prefetchListings(cfg.serverVaultId);
-    const vaults = await this.api.listVaults();
+    const vaults = await (earlyVaults && cfg.serverVaultId === earlyVaultId
+      ? earlyVaults.catch(() => this.api.listVaults())
+      : this.api.listVaults());
     if (this.stale()) return { seeded: false };
     const inOrg = vaults.filter((v) => vaultOrgId(v) === input.organizationId);
     let vaultId = cfg.serverVaultId ?? null;
@@ -4530,7 +4543,7 @@ export class VaultRegistry {
               // belongs to the other FILE, and the content run would stamp it
               // `synced` again moments later. The path is the whole report.
               docId: null,
-              reason: `already registered at ${serverPath} — left on disk, not synced`,
+              reason: `already registered at ${serverPath}, so it was left on disk and not synced`,
               code: null,
             });
             this.sink.item("failed");
@@ -5117,7 +5130,7 @@ export class VaultRegistry {
                 kind: "note",
                 path: rp,
                 docId: null,
-                reason: `already registered at ${res.relPath} — left on disk, not synced`,
+                reason: `already registered at ${res.relPath}, so it was left on disk and not synced`,
                 code: null,
               });
               this.sink.item("failed");

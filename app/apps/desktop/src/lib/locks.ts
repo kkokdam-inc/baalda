@@ -24,9 +24,9 @@ import { syncManager } from "./sync/docSession";
 export type LockScope = "all" | "vault" | "you" | "member";
 
 export const LOCK_TITLES: Record<LockScope, string> = {
-  all: "Locked for everyone — changes won't sync",
-  vault: "Everyone can only view this vault — changes won't sync",
-  you: "Locked for you — changes won't sync",
+  all: "Locked for everyone. Changes won't sync",
+  vault: "Everyone can only view this vault. Changes won't sync",
+  you: "Locked for you. Changes won't sync",
   member: "Locked for a member",
 };
 
@@ -40,6 +40,15 @@ export const LOCK_TITLES: Record<LockScope, string> = {
  * when nothing more specific applies.
  */
 const RANK: Record<LockScope, number> = { all: 3, vault: 2, you: 1, member: 0 };
+
+/**
+ * Lock scopes by path, plus the paths where the CALLER holds their own
+ * per-user `edit` row. Among one person's rows the deepest wins (resolver
+ * `userItemVerdict`), so such a row lifts that person's own ("you") lock on
+ * any ancestor folder: Can view on a folder, Can edit on one subfolder.
+ * Org ("all") locks still cap, exactly as on the server.
+ */
+export type LockScopeMap = Map<string, LockScope> & { personalLifts?: ReadonlySet<string> };
 
 /** Reverse-map every tree node to its server resource id via the registry. */
 export function resourceIdsByPath(tree: TreeNode | null): Map<string, string> {
@@ -110,8 +119,8 @@ export function lockScopesByPath(
   locks: Share[],
   currentUserId: string | undefined,
   lifts: readonly Share[] = [],
-): Map<string, LockScope> {
-  const map = new Map<string, LockScope>();
+): LockScopeMap {
+  const map: LockScopeMap = new Map<string, LockScope>();
   if (!tree || locks.length === 0) return map;
   if (hasVaultLock(locks)) {
     const seed = (n: TreeNode) => {
@@ -123,9 +132,13 @@ export function lockScopesByPath(
   const idToPath = resourceIdsByPath(tree);
   // Before the item rows, so an explicit `locked` row inside a lifted folder
   // still lands and still wins.
+  const personalLifts = new Set<string>();
   for (const lift of lifts) {
     const liftedAt = idToPath.get(shareResourceId(lift));
     if (liftedAt === undefined) continue;
+    if (sharePrincipalType(lift) === "user" && sharePrincipalId(lift) === currentUserId) {
+      personalLifts.add(liftedAt);
+    }
     const prefix = liftedAt + "/";
     for (const [path, scope] of map) {
       if (scope !== "vault") continue;
@@ -144,7 +157,20 @@ export function lockScopesByPath(
     const prev = map.get(path);
     if (!prev || RANK[scope] > RANK[prev]) map.set(path, scope);
   }
+  if (personalLifts.size > 0) map.personalLifts = personalLifts;
   return map;
+}
+
+/**
+ * Whether a path is read-only FOR THE CALLER: an Everyone lock, the vault
+ * posture, or the caller's own row. Another member's row (the `member` scope,
+ * which owners/admins see so they can Unlock a legacy lock) is a badge only;
+ * it never makes the caller's own editor read-only. `member` ranks lowest, so
+ * the effective scope is `member` only when nothing else applies.
+ */
+export function lockBlocksCaller(map: LockScopeMap, path: string): boolean {
+  const scope = effectiveLockForPath(map, path);
+  return scope !== null && scope !== "member";
 }
 
 /**
@@ -158,16 +184,22 @@ export function lockScopesByPath(
  * personal grant made editable, and open it read-only on its first frame.
  */
 export function effectiveLockForPath(
-  map: Map<string, LockScope>,
+  map: LockScopeMap,
   path: string,
 ): LockScope | null {
   let best: LockScope | null = map.get(path) ?? null;
+  const personalLifts = map.personalLifts;
+  // Once the walk passes the caller's own `edit` row, their own ancestor locks
+  // no longer apply (deepest per-user row wins, resolver `userItemVerdict`).
+  let liftedForYou = personalLifts?.has(path) ?? false;
   const parts = path.split("/");
   for (let i = parts.length - 1; i > 0; i--) {
     const ancestor = parts.slice(0, i).join("/");
     const scope = map.get(ancestor);
-    if (!scope || scope === "vault") continue;
-    if (!best || RANK[scope] > RANK[best]) best = scope;
+    if (scope && scope !== "vault" && !(scope === "you" && liftedForYou)) {
+      if (!best || RANK[scope] > RANK[best]) best = scope;
+    }
+    if (personalLifts?.has(ancestor)) liftedForYou = true;
   }
   return best;
 }

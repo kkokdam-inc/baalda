@@ -740,7 +740,7 @@ describe("VaultRegistry.reconcile — a doc_id the server says was deleted", () 
         path: "Gone.md",
         docId: "d1",
         code: "note_deleted",
-        reason: expect.stringContaining("kept on this device"),
+        reason: expect.stringContaining("Kept on this device"),
       }),
     ]);
 

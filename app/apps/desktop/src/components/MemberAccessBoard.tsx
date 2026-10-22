@@ -35,7 +35,7 @@ import { buildOrgRowsByPath } from "../lib/accessMode";
 import { itemLockRows, resourceIdsByPath } from "../lib/locks";
 import { useStore } from "../store";
 
-const LOCKED_TITLE = "Read-only for everyone — moving to Can edit will ask to unlock";
+const LOCKED_TITLE = "Read-only for everyone. Moving to Can edit will ask to unlock";
 
 /** One batcher for the board: a render's reads go out as one request. */
 const summaries = createAccessSummaryBatcher({

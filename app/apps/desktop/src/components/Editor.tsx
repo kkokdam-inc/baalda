@@ -11,6 +11,7 @@ import { foldEffectsFor, parseNoteUiState, persistFolds } from "../lib/editor/fo
 import { propertiesMode as propertiesModeFacet } from "../lib/editor/frontmatter";
 import { loadTypes } from "../lib/frontmatter/types";
 import { dispatchAfterCommit } from "../lib/editor/effectDispatch";
+import { openingCaret } from "../lib/editor/livePreview";
 import { wikilinkTitlesChanged } from "../lib/editor/wikilinks";
 import { wikilinkClickAction } from "../lib/editor/wikilinkResolve";
 import { setActiveNote } from "../lib/editor/activeView";
@@ -18,7 +19,7 @@ import { bindActiveNote } from "../lib/editor/activeNoteBinding";
 import { saveAttachment } from "../lib/attachments";
 import { bridgeManager, type NoteBridge } from "../lib/bridge";
 import { editorMeasureStyle } from "../lib/editorMeasure";
-import { effectiveLockForPath, hasBillingLapsedLock, lockScopesByPath } from "../lib/locks";
+import { hasBillingLapsedLock, lockBlocksCaller, lockScopesByPath } from "../lib/locks";
 import { playPingSound } from "../lib/presence/ping";
 import { syncManager } from "../lib/sync/docSession";
 import { colorForUser, PRESENCE_OFFLINE, statusTone, ringShowsColor } from "../lib/presence/color";
@@ -519,10 +520,10 @@ export function Editor() {
       const st = useStore.getState();
       const lockedLocally =
         syncEnabled &&
-        effectiveLockForPath(
+        lockBlocksCaller(
           lockScopesByPath(st.tree, st.locks, st.session?.user.id, st.lifts),
           notePath,
-        ) != null;
+        );
       const ro = opened.readOnly || opened.status === "no-access" || lockedLocally;
       setReadOnly(ro);
       const editable = new Compartment();
@@ -644,8 +645,24 @@ export function Editor() {
       });
       setMountedNotePath(notePath);
 
+      // Start the caret in the visible body, never on what the header hides
+      // (the duplicate first H1, a Properties panel's YAML): focus would
+      // otherwise reveal that line, and peers would see our caret off the page.
+      const caretView = view;
+      const parkCaret = () => {
+        if (cancelled || viewRef.current !== caretView) return;
+        const pos = openingCaret(caretView.state);
+        if (pos != null) caretView.dispatch({ selection: { anchor: pos } });
+      };
+      parkCaret();
+      let revealed = false;
       const reveal = () => {
-        if (!cancelled) setReadyNotePath(notePath);
+        if (cancelled) return;
+        // A cold note's text arrives after mount, mapped around the caret at 0.
+        // Once, and deferred: this can run from inside a Y.Text observer.
+        if (!readyAtMount && !revealed) queueMicrotask(parkCaret);
+        revealed = true;
+        setReadyNotePath(notePath);
       };
       const readyAtMount = noteContentReady({
         textLength: bridge.text.length,
@@ -985,7 +1002,7 @@ export function Editor() {
           <div className="version-preview">
             <div className="version-preview-host" ref={previewHostRef} />
             <span className="version-preview-pill" role="status">
-              Viewing version from {agoFromIso(previewedAt, Date.now())} — read-only
+              Viewing version from {agoFromIso(previewedAt, Date.now())} (read-only)
             </span>
           </div>
         )}

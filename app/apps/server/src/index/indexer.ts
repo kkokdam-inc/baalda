@@ -79,6 +79,25 @@ export async function extractDocText(
 }
 
 /**
+ * Finds the doc the sync server currently holds in memory, if any. Registered
+ * once at startup (`index.ts`) so this module never imports the sync server.
+ */
+export type LiveDocLookup = (vaultId: string, docId: string) => Y.Doc | undefined;
+
+let liveDocLookup: LiveDocLookup | null = null;
+
+/**
+ * Let {@link indexDoc} read a loaded doc's text straight from memory instead of
+ * rebuilding a throwaway Y.Doc from Postgres. The loaded doc already holds every
+ * persisted op (it was hydrated from the store and every later update went
+ * through it), so its text is the same — or newer — than a reload would give.
+ * `null` unregisters (tests).
+ */
+export function setLiveDocLookup(fn: LiveDocLookup | null): void {
+  liveDocLookup = fn;
+}
+
+/**
  * Index one note now (no debounce). Resolves the doc's vault + title from the
  * notes table, extracts its text, then upserts note_index and replaces the
  * doc's note_links rows. No-op for docs with no live note row (e.g. binary
@@ -110,7 +129,10 @@ export async function indexDoc(
 
   // Postgres rejects NUL in `text`; a single such byte in one note used to fail
   // that note's indexing forever (see `pgText`).
-  const content = pgText(await extractDocText(docId, db));
+  const live = liveDocLookup?.(note.vault_id, docId);
+  const content = pgText(
+    live ? live.getText(CONTENT_FIELD).toString() : await extractDocText(docId, db),
+  );
   const title = pgText(note.title ?? relPathStem(note.rel_path));
   const links = parseWikilinks(content);
   // Embed title + body so a query matching the title still ranks the note.

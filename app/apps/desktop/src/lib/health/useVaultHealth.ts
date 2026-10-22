@@ -800,7 +800,7 @@ export async function buildIssueReport(
   }
 
   const lines: string[] = [];
-  lines.push(`Baalda — ${issue.title}`);
+  lines.push(`Baalda: ${issue.title}`);
   if (issue.path) lines.push(issue.path);
   lines.push("");
   lines.push(issue.why);
@@ -881,7 +881,7 @@ export async function buildDiagnostics(
 
   lines.push("stages:");
   for (const s of report.stages) {
-    lines.push(`  ${s.id} [${s.state}] ${s.headline} — ${s.detail}`);
+    lines.push(`  ${s.id} [${s.state}] ${s.headline}: ${s.detail}`);
   }
   lines.push("");
 

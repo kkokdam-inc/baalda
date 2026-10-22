@@ -596,6 +596,9 @@ describe("SyncManager — ready.empty is the authority", () => {
       (docId: string) => notes.find((n) => n.docId === docId)?.relPath ?? null,
     );
     fakeRegistry.emptyOnDisk = new Set(["Daily/_Index.md", "Departments/_Index.md"]);
+    fakeDisk.files.set("Daily/_Index.md", "");
+    fakeDisk.files.set("Departments/_Index.md", "");
+    fakeDisk.files.set("Real.md", "real text");
     for (const n of notes) fakeRegistry.pushed.add(n.docId);
     const sm = new SyncManager();
     const badges: Record<string, string> = {};

@@ -16,6 +16,8 @@ import {
   verifyMcpToken,
 } from "../../mcp/tokens.js";
 import { TOOLS } from "../../mcp/tools.js";
+import { mcpBuckets, rateLimitKey, toolCallCost } from "../../mcp/rate-limit.js";
+import { inc } from "../../metrics/sync-metrics.js";
 
 /**
  * The tool catalog every connection can reach (identical for all tokens; the
@@ -69,6 +71,12 @@ const WWW_AUTHENTICATE = `Bearer resource_metadata="${config.betterAuthUrl}/.wel
  * connector traffic arrives from shared egress addresses, and an OAuth client's
  * first discovery request carries NO token and is never limited.
  */
+/** Most JSON-RPC messages one POST /api/mcp may carry. */
+export const MCP_MAX_BATCH = 50;
+
+/** JSON-RPC error code for a rate-limited request (server-defined range). */
+export const MCP_RATE_LIMITED = -32029;
+
 const BAD_TOKEN_LIMIT = 20;
 const BAD_TOKEN_WINDOW_MS = 10 * 60_000;
 const BAD_TOKEN_MAX_KEYS = 10_000;
@@ -211,6 +219,55 @@ export function createMcpRoutes(deps: McpDeps): Hono {
 
     // A batch (array) or a single message. Notifications yield no response.
     const messages = Array.isArray(body) ? body : [body];
+    // Bound the work one request can ask for: every message is a tool call run
+    // in sequence, and an unbounded batch is unbounded cost per request. The
+    // current MCP revision dropped JSON-RPC batching altogether, so no client
+    // that follows it comes near this.
+    if (messages.length > MCP_MAX_BATCH) {
+      return c.json(
+        {
+          jsonrpc: "2.0",
+          id: null,
+          error: { code: -32600, message: `Batch too large: at most ${MCP_MAX_BATCH} messages per request` },
+        },
+        400,
+      );
+    }
+    // Rate limit, per connection and per tool call: the whole request is paid
+    // for up front, all or nothing, so a batch counts every call in it and a
+    // refused request ran nothing (a client can retry it whole).
+    const calls = messages.filter((m) => (m as JsonRpcRequest)?.method === "tools/call");
+    if (calls.length > 0) {
+      let cost = 0;
+      for (const m of calls) {
+        const p = ((m as JsonRpcRequest).params ?? {}) as { name?: unknown; arguments?: unknown };
+        cost += toolCallCost(p.name, p.arguments);
+      }
+      // One call heavier than the whole bucket waits for a full one; a batch
+      // that heavy could never be paid and must be split.
+      const tooBig = cost > mcpBuckets.burst;
+      if (tooBig && calls.length === 1) cost = mcpBuckets.burst;
+      const taken = tooBig && calls.length > 1
+        ? { ok: false as const, retryAfterSeconds: Math.ceil((mcpBuckets.burst * 60) / mcpBuckets.perMinute) }
+        : mcpBuckets.take(rateLimitKey(auth), cost);
+      if (!taken.ok) {
+        inc("mcp.ratelimited");
+        c.header("Retry-After", String(taken.retryAfterSeconds));
+        const isBatch = Array.isArray(body);
+        const message =
+          tooBig && calls.length > 1
+            ? "Rate limit: this batch costs more than one request may spend. Send fewer tool calls per request."
+            : `Rate limit: too many tool calls on this connection. Slow down and retry in ${taken.retryAfterSeconds}s. For large vaults, page list_notes with limit and cursor (cheap) instead of listing the whole vault.`;
+        const ids = isBatch ? messages.map((m) => (m as JsonRpcRequest)?.id ?? null) : [(body as JsonRpcRequest)?.id ?? null];
+        const errors = ids.map((id) => ({
+          jsonrpc: "2.0" as const,
+          id,
+          error: { code: MCP_RATE_LIMITED, message, data: { retryAfterSeconds: taken.retryAfterSeconds } },
+        }));
+        return c.json(isBatch ? errors : errors[0], 429);
+      }
+    }
+
     const responses = [];
     let toolCalls = 0;
     for (const m of messages) {

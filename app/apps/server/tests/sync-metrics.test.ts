@@ -5,6 +5,7 @@ import {
   inc,
   observeCount,
   resetSyncMetrics,
+  SYNC_METRICS_IDLE_EMIT_MS,
   snapshot,
   takeDelta,
 } from "../src/metrics/sync-metrics.js";
@@ -66,5 +67,23 @@ describe("sync-metrics", () => {
     // Totals keep running across flushes.
     expect(snapshot()["checkpoint.docs.text"]).toBe(5);
     expect(info).toHaveBeenCalledTimes(1);
+  });
+
+  it("carries process memory in MB, and logs it every 5 min when idle", () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const t0 = Date.now();
+    inc("seed.applied");
+    const line = flushSyncMetrics(t0)!;
+    const mem = JSON.parse(line.slice("[sync-metrics] ".length)).memMb;
+    for (const k of ["rss", "heapUsed", "heapTotal", "external", "arrayBuffers"]) {
+      expect(typeof mem[k]).toBe("number");
+    }
+    expect(mem.rss).toBeGreaterThan(0);
+    // Idle: silent inside the window, one memory-only line after it.
+    expect(flushSyncMetrics(t0 + 60_000)).toBeNull();
+    const idle = flushSyncMetrics(t0 + SYNC_METRICS_IDLE_EMIT_MS);
+    expect(idle).not.toBeNull();
+    expect(JSON.parse(idle!.slice("[sync-metrics] ".length)).counters).toEqual({});
+    expect(info).toHaveBeenCalledTimes(2);
   });
 });

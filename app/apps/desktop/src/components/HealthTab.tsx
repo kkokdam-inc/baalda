@@ -159,7 +159,7 @@ export function HealthView({
       toast(
         verb === "delete"
           ? `Deleted ${outcome.done.toLocaleString()} local ${outcome.done === 1 ? "copy" : "copies"}`
-          : `Re-registered ${outcome.done.toLocaleString()} ${outcome.done === 1 ? "file" : "files"} — content is uploading now`,
+          : `Re-registered ${outcome.done.toLocaleString()} ${outcome.done === 1 ? "file" : "files"}. Content is uploading now`,
       );
     }
     refresh();
@@ -895,7 +895,7 @@ function Confirms({
           onConfirm={async () => {
             await actions.reregister(confirming.path);
             onDone();
-            toast("Registered — its content is uploading now");
+            toast("Registered. Its content is uploading now");
           }}
         >
           <p className="muted">
@@ -968,7 +968,7 @@ function Confirms({
           <p className="muted">{plan.confirm?.body}</p>
           {plan.unlisted > 0 && (
             <p className="muted">
-              Only the {plan.targets.length.toLocaleString()} shown are touched —{" "}
+              Only the {plan.targets.length.toLocaleString()} shown are touched.{" "}
               {plan.unlisted.toLocaleString()} more were found but not listed. Run the
               checks again afterwards to reach them.
             </p>

@@ -138,7 +138,7 @@ const USER_DECISION_CTE = `
      UNION ALL
      SELECT f.id, COALESCE(u.permission, d.perm)
        FROM folders f
-       JOIN dec d ON f.parent_id = d.id
+       JOIN dec d ON f.parent_id = d.id AND f.vault_id = $2
        LEFT JOIN user_rows u ON u.resource_type = 'folder' AND u.resource_id = f.id
   )`;
 
@@ -183,9 +183,9 @@ async function deniedDocsInVault(
            AND principal_type = $3 AND principal_id = $1
      ),
      denied_subtree AS (
-        SELECT id, parent_id FROM folders WHERE id IN (SELECT id FROM denied_seed)
+        SELECT id, parent_id FROM folders WHERE vault_id = $2 AND id IN (SELECT id FROM denied_seed)
         UNION
-        SELECT f.id, f.parent_id FROM folders f JOIN denied_subtree d ON f.parent_id = d.id
+        SELECT f.id, f.parent_id FROM folders f JOIN denied_subtree d ON f.parent_id = d.id AND f.vault_id = $2
      ),
      denied_files AS (
         SELECT resource_id AS id FROM shares
@@ -263,11 +263,39 @@ async function deniedFolderIds(
  * drift would show up as a note being deleted off someone's disk. A single
  * predicate swap can't drift.
  */
+/**
+ * A memo for the USER-INDEPENDENT reads inside {@link listDocsInVault}, shared
+ * by several users' computations that answer the SAME event (the vault
+ * channel's per-message ACL refresh, where every connected member recomputes at
+ * once). Only reads whose SQL takes no user id go in it — the vault's whole doc
+ * list, the team's (org) item denies and the org posture — so sharing one can
+ * never hand one person another's answer. Callers must create a fresh memo per
+ * event, AFTER that event arrived: a memo is as fresh as its first read, and
+ * that read started after the change it answers was committed.
+ */
+export type SharedVaultReads = Map<string, Promise<unknown>>;
+
+function shareRead<T>(shared: SharedVaultReads | undefined, key: string, read: () => Promise<T>): Promise<T> {
+  if (!shared) return read();
+  let p = shared.get(key) as Promise<T> | undefined;
+  if (!p) {
+    const fresh = read();
+    p = fresh;
+    shared.set(key, fresh);
+    // A failed read is never handed to a later caller.
+    fresh.catch(() => {
+      if (shared.get(key) === fresh) shared.delete(key);
+    });
+  }
+  return p;
+}
+
 async function listDocsInVault(
   userId: string,
   vaultId: string,
   db: Queryable,
   opts: { deleted: boolean },
+  shared?: SharedVaultReads,
 ): Promise<Set<string>> {
   const access = await vaultAccess(db, userId, vaultId);
   if (!access) return new Set(); // unknown vault
@@ -377,9 +405,9 @@ async function listDocsInVault(
              )
        ),
        subtree AS (
-          SELECT id FROM folders WHERE id IN (SELECT id FROM shared_folders)
+          SELECT id FROM folders WHERE vault_id = $2 AND id IN (SELECT id FROM shared_folders)
           UNION
-          SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id
+          SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id AND f.vault_id = $2
        ),
        shared_files AS (
           SELECT resource_id AS id FROM shares
@@ -426,7 +454,10 @@ async function listDocsInVault(
   // "nobody until you name them", and in a vault you set up yourself you wrote
   // nearly everything.
   const userDenied = await deniedDocsInVault(db, "user", userId, vaultId);
-  const orgDenied = await deniedDocsInVault(db, "org", organizationId, vaultId);
+  // Read-only below (never mutated), so a shared instance is safe.
+  const orgDenied = await shareRead(shared, `orgDenied\u0000${organizationId}\u0000${vaultId}`, () =>
+    deniedDocsInVault(db, "org", organizationId, vaultId),
+  );
 
   // A SEALED vault (the Access panel's Private) stops authorship keeping a doc,
   // exactly as an item set Private does — the resolver's posture branch skips
@@ -439,19 +470,26 @@ async function listDocsInVault(
   // A person's own vault level replaces the posture for them, and drops
   // authorship the same way (`view` reaches everything anyway; `denied` is the
   // per-person sealed).
-  const sealed = personal !== null || (await vaultBaseline(db, organizationId)) === "sealed";
+  const sealed =
+    personal !== null ||
+    (await shareRead(shared, `baseline\u0000${organizationId}`, () => vaultBaseline(db, organizationId))) ===
+      "sealed";
 
   let reachable: Set<string>;
   if (vaultWide) {
-    const { rows } = await db.query<{ id: string }>(
-      opts.deleted
-        ? `SELECT id FROM notes WHERE vault_id = $1 AND ${livePredicate}`
-        : `SELECT id FROM notes WHERE vault_id = $1 AND ${livePredicate}
-           UNION
-           SELECT id FROM files WHERE vault_id = $1`,
-      [vaultId],
-    );
-    reachable = new Set(rows.map((r) => r.id));
+    const all = await shareRead(shared, `all\u0000${opts.deleted ? "deleted" : "live"}\u0000${vaultId}`, async () => {
+      const { rows } = await db.query<{ id: string }>(
+        opts.deleted
+          ? `SELECT id FROM notes WHERE vault_id = $1 AND ${livePredicate}`
+          : `SELECT id FROM notes WHERE vault_id = $1 AND ${livePredicate}
+             UNION
+             SELECT id FROM files WHERE vault_id = $1`,
+        [vaultId],
+      );
+      return new Set(rows.map((r) => r.id));
+    });
+    // `reachable` is edited below; the shared set must stay untouched.
+    reachable = new Set(all);
   } else {
     // A personal `denied` drops org item grants too (resolver
     // `personalVaultLevel`): only per-user shares reach the person.
@@ -487,9 +525,9 @@ async function listDocsInVault(
                 OR (principal_type = 'org' AND principal_id = $3
                     AND access_revision > $4))
          ), subtree AS (
-           SELECT id FROM folders WHERE id IN (SELECT id FROM allowed_folders)
+           SELECT id FROM folders WHERE vault_id = $2 AND id IN (SELECT id FROM allowed_folders)
            UNION
-           SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id
+           SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id AND f.vault_id = $2
          ), allowed_files AS (
            SELECT resource_id AS id FROM shares
             WHERE resource_type = 'file'
@@ -545,8 +583,9 @@ export async function listReadableDocsInVault(
   userId: string,
   vaultId: string,
   db: Queryable = defaultPool,
+  shared?: SharedVaultReads,
 ): Promise<Set<string>> {
-  return listDocsInVault(userId, vaultId, db, { deleted: false });
+  return listDocsInVault(userId, vaultId, db, { deleted: false }, shared);
 }
 
 /**
@@ -639,7 +678,7 @@ export async function listVisibleFolders(
               AND s.principal_type = 'user' AND s.principal_id = $1
               AND s.permission IN ('view', 'edit', 'readonly')
            UNION
-           SELECT f.id FROM folders f JOIN granted g ON f.parent_id = g.id
+           SELECT f.id FROM folders f JOIN granted g ON f.parent_id = g.id AND f.vault_id = $2
          ) SELECT id FROM granted`,
         [userId, vaultId],
       );
@@ -715,7 +754,7 @@ export async function listVisibleFolders(
      down AS (
         SELECT id, parent_id FROM folders WHERE vault_id = $2 AND id IN (SELECT id FROM seed)
         UNION
-        SELECT f.id, f.parent_id FROM folders f JOIN down d ON f.parent_id = d.id
+        SELECT f.id, f.parent_id FROM folders f JOIN down d ON f.parent_id = d.id AND f.vault_id = $2
      ),
      note_folders AS (
         SELECT DISTINCT folder_id AS id FROM notes
@@ -727,7 +766,7 @@ export async function listVisibleFolders(
          WHERE vault_id = $2
            AND id IN (SELECT id FROM down UNION SELECT id FROM note_folders)
         UNION
-        SELECT f.id, f.parent_id FROM folders f JOIN up u ON f.id = u.parent_id
+        SELECT f.id, f.parent_id FROM folders f JOIN up u ON f.id = u.parent_id AND f.vault_id = $2
      )
      SELECT DISTINCT id FROM up`,
     [userId, vaultId, access.organizationId, isMember, [...readable], authorSeeds],
@@ -746,7 +785,7 @@ export async function listVisibleFolders(
          SELECT id, parent_id FROM folders
           WHERE vault_id = $2 AND id IN (SELECT id FROM granted)
          UNION
-         SELECT f.id, f.parent_id FROM folders f JOIN down d ON f.parent_id = d.id
+         SELECT f.id, f.parent_id FROM folders f JOIN down d ON f.parent_id = d.id AND f.vault_id = $2
        ), note_folders AS (
          SELECT DISTINCT folder_id AS id FROM notes
           WHERE vault_id = $2 AND deleted_at IS NULL AND folder_id IS NOT NULL
@@ -759,7 +798,7 @@ export async function listVisibleFolders(
           WHERE vault_id = $2
             AND id IN (SELECT id FROM down UNION SELECT id FROM note_folders)
          UNION
-         SELECT f.id, f.parent_id FROM folders f JOIN up u ON f.id = u.parent_id
+         SELECT f.id, f.parent_id FROM folders f JOIN up u ON f.id = u.parent_id AND f.vault_id = $2
        )
        SELECT id FROM up`,
       [userId, vaultId, access.organizationId, snapshot.accessRevision, [...readable]],

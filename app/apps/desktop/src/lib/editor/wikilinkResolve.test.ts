@@ -71,6 +71,25 @@ describe("isWikilinkResolved", () => {
     expect(ok("baalda ROADMAP")).toBe(true);
   });
 
+  it("matches across Unicode normalization forms (NFC vs NFD)", () => {
+    const nfc = "한글";
+    const nfd = nfc.normalize("NFD");
+    expect(nfd).not.toBe(nfc);
+    // macOS hands back an NFD file name; the typed link is NFC.
+    const nfdFile: NoteTitle[] = [
+      { id: "k", path: `Notes/${nfd}.md`, title: `${nfd} 노트` },
+    ];
+    expect(isWikilinkResolved(nfc, nfdFile)).toBe(true);
+    expect(isWikilinkResolved(`Notes/${nfc}`, nfdFile)).toBe(true);
+    expect(isWikilinkResolved(`${nfc} 노트`, nfdFile)).toBe(true);
+    // And the other way round: an NFC file name, an NFD link.
+    const nfcFile: NoteTitle[] = [{ id: "k", path: `${nfc}.md`, title: "" }];
+    expect(isWikilinkResolved(nfd, nfcFile)).toBe(true);
+    // Accented Latin too.
+    const cafe: NoteTitle[] = [{ id: "c", path: "Café.md", title: "" }];
+    expect(isWikilinkResolved("CAFÉ", cafe)).toBe(true);
+  });
+
   it("strips alias and heading before resolving", () => {
     expect(ok("Inbox|my inbox")).toBe(true);
     expect(ok("Inbox#Today")).toBe(true);

@@ -2477,10 +2477,15 @@ pub async fn list_yjs_state_vectors(
     state: State<'_, AppState>,
     expected_epoch: Option<u64>,
 ) -> AppResult<tauri::ipc::Response> {
-    let (_, index) = require_vault_at(&state, expected_epoch)?;
-    let rows = {
-        let guard = index.lock().unwrap();
-        guard.list_yjs_state_vectors()?
+    let (vault, index) = require_vault_at(&state, expected_epoch)?;
+    // A read-only WAL connection never waits on the open-time rebuild that
+    // holds the index mutex; fall back to the locked path if it cannot open.
+    let rows = match Index::list_yjs_state_vectors_readonly(&vault) {
+        Ok(rows) => rows,
+        Err(_) => {
+            let guard = index.lock().unwrap();
+            guard.list_yjs_state_vectors()?
+        }
     };
     Ok(tauri::ipc::Response::new(encode_state_vectors(&rows)))
 }

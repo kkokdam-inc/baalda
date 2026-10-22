@@ -408,7 +408,7 @@ export function MembersAccessTab({ canManage, onOpenTab, onCloseSettings, resetT
     const limit = result?.error ? inviteLimitError(result.error) : null;
     if (limit) setLimitCause(limit);
     else if (result?.error) setError(result.error);
-    else toast(result?.emailed ? `Invitation emailed to ${inv.email}` : `Invitation renewed — copy its link for ${inv.email}`);
+    else toast(result?.emailed ? `Invitation emailed to ${inv.email}` : `Invitation renewed. Copy its link for ${inv.email}`);
   });
 
   const askRevoke = (inv: InvitationOverview) => setConfirm({

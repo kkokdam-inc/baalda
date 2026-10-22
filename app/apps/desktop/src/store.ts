@@ -14,7 +14,7 @@ import {
   readItemColors,
   writeItemColors,
 } from "./lib/appearance";
-import { effectiveLockForPath, lockScopesByPath } from "./lib/locks";
+import { lockBlocksCaller, lockScopesByPath } from "./lib/locks";
 import { readItemOrder, renameInOrder, writeItemOrder, type ItemOrder } from "./lib/ordering";
 import { loadedFolderPaths, mergeChildren, nodeAt, setChildrenAt } from "./lib/tree/lazyTree";
 import { applyTitlePatch } from "./lib/tree/titles";
@@ -756,7 +756,10 @@ interface AppStore {
   closeAllTabs: () => void;
 
   // Auth actions
-  initAuth: () => Promise<void>;
+  /** `session`: an `authManager.init()` already in flight (launch starts it
+   *  beside the update gate so the keychain read + session round trip overlap
+   *  it); omitted, the restore starts its own. */
+  initAuth: (opts?: { session?: Promise<SessionInfo | null> }) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
@@ -1016,6 +1019,9 @@ interface AppStore {
   openRightPanel: (tab?: RightPanelTab) => void;
   closeRightPanel: () => void;
   setRightPanelTab: (tab: RightPanelTab) => void;
+  /** The header's Version history button: open the panel on Versions, switch
+   *  to it from Activity, or close the panel when Versions is already showing. */
+  toggleVersionsPanel: () => void;
   /** Load one version's markdown for the read-only editor overlay. */
   previewVersion: (versionId: number) => Promise<void>;
   clearVersionPreview: () => void;
@@ -1606,7 +1612,7 @@ function promptSignInForQueuedLink(
   set: (partial: Partial<AppStore>) => void,
 ): void {
   set({ authPrompt: "note-link" });
-  toast("Sign in to open this shared note — it will open right after you sign in", "neutral");
+  toast("Sign in to open this shared note. It will open right after you sign in", "neutral");
 }
 
 /**
@@ -1829,7 +1835,7 @@ function sameVault(get: () => AppStore, epoch: number | null | undefined): boole
 function rootCreateBlocked(get: () => AppStore, dir: string): boolean {
   if (dir !== "" || !get().rootFrozen) return false;
   toast(
-    "This vault's root is frozen — create this inside a folder instead.",
+    "This vault's root is frozen. Create this inside a folder instead.",
     "error",
   );
   return true;
@@ -2085,6 +2091,10 @@ export const useStore = create<AppStore>((set, get) => ({
   closeRightPanel: () =>
     set({ rightPanel: null, versionPanelDocId: null, noteVersions: null, versionPreview: null }),
   setRightPanelTab: (tab) => get().openRightPanel(tab),
+  toggleVersionsPanel: () => {
+    if (get().rightPanel?.tab === "versions") get().closeRightPanel();
+    else get().openRightPanel("versions");
+  },
   settingsDismissToken: 0,
   dismissSettings: () =>
     set((s) => ({
@@ -2650,7 +2660,7 @@ export const useStore = create<AppStore>((set, get) => ({
           if (get().syncStatus === "synced" && !registerFailureToasted.has(path)) {
             registerFailureToasted.add(path);
             toast(
-              `"${title}" couldn't be registered for sync — ${
+              `"${title}" couldn't be registered for sync: ${
                 e instanceof Error ? e.message : String(e)
               }. It's saved on this device and will be retried.`,
               "error",
@@ -2769,7 +2779,7 @@ export const useStore = create<AppStore>((set, get) => ({
         // Actually signed out: put the sign-in dialog up. "unknown" stays
         // silent — initAuth resolves it either way and consumes the queue.
         set({ authPrompt: "note-link" });
-        toast("Sign in to open this shared note — it will open right after you sign in", "neutral");
+        toast("Sign in to open this shared note. It will open right after you sign in", "neutral");
       }
       return;
     }
@@ -2798,7 +2808,7 @@ export const useStore = create<AppStore>((set, get) => ({
       // consumes it, and dismissing the prompt drops it.
       queueNoteLink(url);
       toast(
-        `Choose a folder for “${pendingFolder.orgName}” — the shared note will open once it's set`,
+        `Choose a folder for “${pendingFolder.orgName}”. The shared note will open once it's set`,
         "neutral",
       );
       return;
@@ -2811,7 +2821,7 @@ export const useStore = create<AppStore>((set, get) => ({
     const progressTimer = setTimeout(() => {
       const name =
         get().organizations.find((o) => o.id === target.orgId)?.name ?? "the vault";
-      progressToastId = toast(`Opening shared note — syncing “${name}”…`, "neutral");
+      progressToastId = toast(`Opening shared note. Syncing “${name}”…`, "neutral");
     }, 1_000);
     const path = await waitForDocPath(target.docId, {
       isBusy: () => {
@@ -3086,7 +3096,7 @@ export const useStore = create<AppStore>((set, get) => ({
 
   // ---- Auth ----
 
-  initAuth: async () => {
+  initAuth: async (opts) => {
     syncManager.setStatusListener((status) => get().setSyncStatus(status));
     // The closed-app edits pass (#284) skips padlocked notes, read from the same
     // lock view the editor and sidebar use, fetched fresh (a throw = push nothing).
@@ -3100,7 +3110,7 @@ export const useStore = create<AppStore>((set, get) => ({
       const lifts = overlay.filter((s) => s.permission === "edit");
       const state = get();
       const map = lockScopesByPath(state.tree, locks, state.session?.user.id, lifts);
-      return (relPath) => effectiveLockForPath(map, relPath) != null;
+      return (relPath) => lockBlocksCaller(map, relPath);
     });
     syncManager.setSyncPauseListener((pause) => set({ syncPause: pause }));
     syncManager.setVaultStatusListener((status) => {
@@ -3259,7 +3269,7 @@ export const useStore = create<AppStore>((set, get) => ({
     let gen = ++authInitGen;
     const superseded = () => authInitGen !== gen;
     try {
-      const session = await authManager.init();
+      const session = await (opts?.session ?? authManager.init());
       perf.mark("auth-resolved");
       if (superseded()) return;
       set({ serverUrl: authManager.getServerUrl() });
@@ -3411,7 +3421,7 @@ export const useStore = create<AppStore>((set, get) => ({
         const methods = await authManager.api.getAuthMethods();
         if (methods.passwordReset && session.user.emailVerified === false) {
           toast(
-            `Account created. We sent a confirmation email to ${session.user.email} — click its link to confirm your address.`,
+            `Account created. We sent a confirmation email to ${session.user.email}. Click its link to confirm your address.`,
             "neutral",
           );
         }
@@ -4026,6 +4036,14 @@ export const useStore = create<AppStore>((set, get) => ({
       // A folder that is present but won't open falls through to the SAME
       // prompt as before, but only after the org is active: the prompt's
       // resolution enables sync from the session, so it must name this vault.
+      // The server activation runs BESIDE the folder open (#E): every route the
+      // sync path uses (vault token, per-doc sync token, registry listings,
+      // locks, the vault channel) authorizes by MEMBERSHIP and names the org
+      // explicitly; only panel routes (join code, MCP token, a POST /vaults
+      // without an org) read the session's active org. Settled here so a
+      // rejection is only ever observed by the awaits below.
+      const activation = authManager.api.setActiveOrganization(organizationId);
+      activation.catch(() => {});
       const bound = readOrgVaults()[organizationId];
       const boundOk = !!bound && (await ipc.folderExists(bound).catch(() => false));
       if (superseded()) return;
@@ -4043,24 +4061,37 @@ export const useStore = create<AppStore>((set, get) => ({
         if (openError === null) set({ switchingVault: null });
       }
 
-      await authManager.api.setActiveOrganization(organizationId);
-      if (superseded()) return;
-      const session = await authManager.currentSession();
-      if (superseded()) return;
-      set({ session });
-
       if (boundOk && openError === null) {
+        // The folder is open: start its sync now instead of after two serial
+        // round trips (activate, re-read the session). `enableSyncForVault`
+        // reads the org from the session, so name the new org on the local
+        // session first; the server's answer replaces it below.
+        const prior = get().session;
+        if (prior && prior.activeOrganizationId !== organizationId) {
+          set({ session: { ...prior, activeOrganizationId: organizationId } });
+        }
+        void get()
+          .enableSyncForVault({ background: true })
+          .catch((e) => console.warn("[sync] enable after switch failed", e));
+        await activation;
+        if (superseded()) return;
+        const confirmed = await authManager.currentSession();
+        if (superseded()) return;
+        set({ session: confirmed });
         // Roster + seat usage feed the members and billing panels, not the tree,
         // and the reconcile is the part that scales with the vault: none of them
         // is worth making the user wait for. Each swallows its own errors and
         // gates its state writes on this still being the open vault.
         void get().refreshVault();
         void get().refreshOrgBilling();
-        void get()
-          .enableSyncForVault({ background: true })
-          .catch((e) => console.warn("[sync] enable after switch failed", e));
         return;
       }
+
+      await activation;
+      if (superseded()) return;
+      const session = await authManager.currentSession();
+      if (superseded()) return;
+      set({ session });
 
       await get().refreshVault();
       if (superseded()) return;
@@ -4258,7 +4289,7 @@ export const useStore = create<AppStore>((set, get) => ({
       }
       const session = await authManager.currentSession();
       if (session) set({ session });
-      toast("Email confirmed — thanks!", "success");
+      toast("Email confirmed. Thanks!", "success");
       return;
     }
     // "signin": a password reset in the browser revoked every session for that
@@ -4271,7 +4302,7 @@ export const useStore = create<AppStore>((set, get) => ({
     }
     if (get().authStatus === "signed-in") await get().signOut();
     set({ authPrompt: "sign-in" });
-    toast("Password updated — sign in with your new password.", "success");
+    toast("Password updated. Sign in with your new password.", "success");
   },
 
   handleBillingLink: async (orgId) => {
@@ -4303,7 +4334,7 @@ export const useStore = create<AppStore>((set, get) => ({
     // Paid, but the confirmation hasn't landed yet (provider still processing,
     // or a webhook on its way). Polling in the Upgrade dialog and the next
     // Billing visit pick it up; say so rather than nothing.
-    toast("Payment received — your subscription will show up in a moment.", "neutral");
+    toast("Payment received. Your subscription will show up in a moment.", "neutral");
   },
 
   removeMember: async (userId) => {
@@ -4852,7 +4883,12 @@ export const useStore = create<AppStore>((set, get) => ({
         .catch((e) => console.warn("[sync] enable failed", e));
     }
     await get().refreshTree();
-    await get().refreshTitles();
+    // Titles wait on the index lock, which the background rebuild holds; the
+    // `index-ready` event refreshes them again once it commits, so the switch
+    // must not sit behind the rebuild (launch already voids this the same way).
+    void get()
+      .refreshTitles()
+      .catch((e) => console.warn("[vault] title refresh failed", e));
     // A shared link parked on the choose-a-folder prompt resumes here, now
     // that the vault has a folder and its pull has started. Guarded by orgId
     // so a link queued for some OTHER flow isn't eaten by an unrelated bind.
@@ -4930,7 +4966,7 @@ export const useStore = create<AppStore>((set, get) => ({
     const v = get().vault;
     const orgId = get().session?.activeOrganizationId ?? null;
     if (!v || !get().syncEnabled || !orgId) {
-      throw new Error("Only a synced vault can be reset — a local vault has no other copy.");
+      throw new Error("Only a synced vault can be reset. A local vault has no other copy.");
     }
     // Every tab names a file about to be deleted.
     get().closeAllTabs();
@@ -5366,13 +5402,15 @@ export const useStore = create<AppStore>((set, get) => ({
         rememberLastVault(orgId);
         // Reconcile may have materialized server-only notes onto disk; refresh so
         // the sidebar reflects the full vault, not just what was already local.
-        await get().refreshTree();
-        if (stale()) return;
-        await get().refreshTitles();
-        if (stale()) return;
-        await get().refreshLocks();
-        if (stale()) return;
-        await get().refreshVaultSettings();
+        // Independent reads (disk tree, index titles, server locks, server
+        // settings): run them together instead of four serial round trips.
+        // Each one re-checks its own vault epoch before writing state.
+        await Promise.all([
+          get().refreshTree(),
+          get().refreshTitles(),
+          get().refreshLocks(),
+          get().refreshVaultSettings(),
+        ]);
         if (stale()) return;
         // A brand-new vault was just seeded with welcome content — greet the
         // user with the welcome note if nothing else is open.

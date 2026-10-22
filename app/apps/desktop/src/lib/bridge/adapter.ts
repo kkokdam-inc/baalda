@@ -31,7 +31,7 @@ function errorText(err: unknown): string {
 export function reportSaveFailure(relPath: string, err: unknown, attempt: number): void {
   if (saveFailureToasts.has(relPath)) return;
   const id = toast(
-    `Couldn't save "${baseName(relPath)}" to disk — ${errorText(err)}. Your text is kept and the save will be retried.`,
+    `Couldn't save "${baseName(relPath)}" to disk: ${errorText(err)}. Your text is kept and the save will be retried.`,
     "error",
   );
   saveFailureToasts.set(relPath, id);

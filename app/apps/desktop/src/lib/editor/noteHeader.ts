@@ -37,6 +37,7 @@
 
 import {
   type Compartment,
+  EditorSelection,
   EditorState,
   type Extension,
   Prec,
@@ -48,8 +49,6 @@ import {
   type DecorationSet,
   EditorView,
   keymap,
-  ViewPlugin,
-  type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
 import { createElement, type ReactNode } from "react";
@@ -184,7 +183,7 @@ class InvalidWidget extends WidgetType {
     strong.textContent = "Properties can't be shown";
     const rest = document.createElement("span");
     rest.textContent =
-      " — this note's YAML is outside what Baalda edits, so it is shown as text and never rewritten.";
+      ". This note's YAML is outside what Baalda edits, so it is shown as text and never rewritten.";
     host.append(strong, rest);
     return host;
   }
@@ -253,55 +252,44 @@ function build(state: EditorState, opts: NoteHeaderOptions): DecorationSet {
  * editor without one and keep Stage 1's dimmed frontmatter block.
  */
 /**
- * The title is a zero-length widget above position 0, so drawSelection's wash
- * stops at the top of the body and a ⌘A visibly "leaves the title out". The
- * title is not document text (copying still copies the note, not the file
- * name), but a selection that reaches the very start of the document should
- * READ as whole, so mirror it: while a non-empty selection includes position 0,
- * the title host carries `is-selected` and paints the same wash.
+ * Keep a pointer selection in the body. The title is the FILE NAME, not
+ * document text, and the Properties panel stands in for frontmatter the reader
+ * chose not to see as text — so a drag from the body up over either one (or
+ * over the top padding, where `posAtCoords` answers 0) must stop at the first
+ * body position, the way a plain text editor stops at its first line. Without
+ * this, the head landed on 0: with frontmatter that silently selected (and
+ * copied) the hidden YAML, and the panel was painted as selected.
+ *
+ * Pointer selections only (`select.pointer`): ⌘A, ⇧↑ and programmatic
+ * selections keep the whole document, which is what a copy of "everything"
+ * should carry. Source and invalid presentations show the YAML as editable
+ * text, so it is selectable there like any other line.
  */
-const titleSelectionMirror = ViewPlugin.fromClass(
-  class {
-    constructor(view: EditorView) {
-      this.sync(view);
-    }
-    update(u: ViewUpdate) {
-      if (u.selectionSet || u.docChanged || u.focusChanged || u.viewportChanged) {
-        this.sync(u.view);
-      }
-    }
-    private frame = 0;
-    private sync(view: EditorView) {
-      const host = view.contentDOM.querySelector<HTMLElement>(".cm-note-title");
-      if (!host) return;
-      const sel = view.state.selection.main;
-      const on = !sel.empty && sel.from === 0;
-      host.classList.toggle("is-selected", on);
-      if (!on) {
-        host.style.removeProperty("--title-sel-extend");
-        return;
-      }
-      // drawSelection starts its wash at the first line's TEXT top, not the
-      // line box's top, so a strip of line leading stayed unpainted between
-      // the title's wash and the body's — two boxes instead of one. Measure
-      // that strip once the layer has drawn (next frame) and let the title's
-      // wash reach down over it. Capped: anything taller than a leading (a
-      // properties block in between) is not this gap.
-      cancelAnimationFrame(this.frame);
-      this.frame = requestAnimationFrame(() => {
-        let top = Infinity;
-        for (const r of view.dom.querySelectorAll(".cm-selectionLayer .cm-selectionBackground")) {
-          top = Math.min(top, r.getBoundingClientRect().top);
-        }
-        const gap = top - host.getBoundingClientRect().bottom;
-        host.style.setProperty("--title-sel-extend", `${gap > 0 && gap <= 40 ? Math.ceil(gap) : 0}px`);
-      });
-    }
-    destroy() {
-      cancelAnimationFrame(this.frame);
-    }
-  },
-);
+export function clampSelectionToBody(
+  selection: EditorSelection,
+  start: number,
+): EditorSelection {
+  if (start <= 0) return selection;
+  if (selection.ranges.every((r) => r.anchor >= start && r.head >= start)) {
+    return selection;
+  }
+  return EditorSelection.create(
+    selection.ranges.map((r) =>
+      EditorSelection.range(Math.max(r.anchor, start), Math.max(r.head, start)),
+    ),
+    selection.mainIndex,
+  );
+}
+
+const pointerSelectionInBody = EditorState.transactionFilter.of((tr) => {
+  if (!tr.selection || tr.docChanged || !tr.isUserEvent("select.pointer")) return tr;
+  const view = frontmatterView(tr.startState);
+  if (view !== "panel" && view !== "collapsed") return tr;
+  const fm = tr.startState.field(frontmatterField, false) ?? null;
+  const start = bodyStart(fm, tr.startState.doc.length);
+  const clamped = clampSelectionToBody(tr.selection, start);
+  return clamped === tr.selection ? tr : [tr, { selection: clamped, sequential: true }];
+});
 
 /**
  * Defence in depth for view-only notes. The panel already renders static text
@@ -333,7 +321,7 @@ export function noteHeader(opts: NoteHeaderOptions): Extension {
     opts.modeCompartment ? opts.modeCompartment.of(modeExt) : modeExt,
     field,
     readOnlyPropertiesGuard,
-    titleSelectionMirror,
+    pointerSelectionInBody,
     // `Prec.high` so these beat defaultKeymap's own arrow handling.
     Prec.high(
       keymap.of([

@@ -24,6 +24,7 @@ import {
 import { useGraphData } from "../lib/graph/useGraphData";
 import { WebGLGraphRenderer, type RenderNode } from "../lib/graph/webglRenderer";
 import { SimClient } from "../lib/graph/simClient";
+import { graphDebugEnabled } from "../lib/graph/graphDebug";
 import { useStore } from "../store";
 import { GraphControls } from "./GraphControls";
 import { Spinner } from "./Spinner";
@@ -34,7 +35,7 @@ import "./graph.css";
 // but we own the clock: the sim's internal timer is stopped and we call
 // sim.tick() ourselves inside a requestAnimationFrame loop so painting and
 // physics share one frame. React owns only React-y things — data loading, the
-// settings panel, header counts. Camera / hover / drag / positions all live in
+// settings panel, the counts the loading states use. Camera / hover / drag / positions all live in
 // refs so interaction never triggers a reconciliation pass.
 // ---------------------------------------------------------------------------
 
@@ -469,6 +470,8 @@ export function GraphView({ onClose }: { onClose: () => void }) {
   const webglOkRef = useRef(false);
   const [webglError, setWebglError] = useState<string | null>(null);
   // On-screen WebGL diagnostic (updated imperatively, sampled to state below).
+  // Shown only in dev builds or with the explicit flag (see graphDebug.ts).
+  const [showDiag] = useState(() => graphDebugEnabled());
   const diagRef = useRef("");
   const [diag, setDiag] = useState("");
   // Hover tooltip for the WebGL global view: the hovered note's name + position
@@ -828,12 +831,13 @@ export function GraphView({ onClose }: { onClose: () => void }) {
   }, [openNotePath, rebuild]);
 
   // Sample the imperative WebGL diagnostic into state a couple times a second
-  // (diagnostic HUD only; avoids a per-frame setState).
+  // (diagnostic HUD only; avoids a per-frame setState). Dev builds or the
+  // explicit debug flag only: a release build never shows the HUD.
   useEffect(() => {
-    if (!WEBGL_ENABLED) return;
+    if (!WEBGL_ENABLED || !showDiag) return;
     const id = setInterval(() => setDiag(diagRef.current), 500);
     return () => clearInterval(id);
-  }, []);
+  }, [showDiag]);
 
   // Self-heal an empty graph: if the data came back with no nodes (the view can
   // mount before the vault's index is ready), retry a few times. A genuinely
@@ -1323,7 +1327,7 @@ export function GraphView({ onClose }: { onClose: () => void }) {
         ),
         dpr,
       );
-      diagRef.current =
+      if (showDiag) diagRef.current =
         `webgl ✓ · nodes ${webglNodes.length} · buf ${webglCanvas.width}×${webglCanvas.height} · ` +
         `k ${cam.k.toFixed(3)} · cam ${Math.round(cam.x)},${Math.round(cam.y)} · ` +
         `bounds ${Math.round(minX)},${Math.round(minY)}..${Math.round(maxX)},${Math.round(maxY)} · ` +
@@ -1571,15 +1575,13 @@ export function GraphView({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="graph-view" ref={wrapRef}>
-      <div className="graph-header">
-        <span className="graph-title">Graph</span>
-        <span className="graph-counts">
-          {counts.total > counts.nodes
-            ? `${counts.nodes.toLocaleString()} of ${counts.total.toLocaleString()} notes`
-            : `${counts.nodes} ${counts.nodes === 1 ? "note" : "notes"}`}{" "}
-          · {counts.edges} {counts.edges === 1 ? "link" : "links"}
-        </span>
-        <span className="graph-header-spacer" />
+      {/* No title bar: the canvas runs to the top edge. A strip along it keeps
+          the window draggable where the OS chrome would be (macOS traffic-light
+          row, Windows caption row; zero height on Linux, whose native title bar
+          sits above the webview). The three controls float top-right, clear of
+          both, on their own translucent pill so they read on the dark canvas. */}
+      <div className="graph-drag-strip" data-tauri-drag-region />
+      <div className="graph-floating-controls" role="toolbar" aria-label="Graph controls">
         <button
           className={`graph-icon-btn${showControls ? " is-active" : ""}`}
           title="Graph settings"
@@ -1648,10 +1650,10 @@ export function GraphView({ onClose }: { onClose: () => void }) {
               zIndex: 5,
             }}
           >
-            WebGL unavailable — showing capped 2D fallback. {webglError}
+            WebGL unavailable. Showing capped 2D fallback. {webglError}
           </div>
         )}
-        {WEBGL_ENABLED && settings.scope === "global" && diag && (
+        {showDiag && WEBGL_ENABLED && settings.scope === "global" && diag && (
           <div
             style={{
               position: "absolute",

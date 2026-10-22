@@ -226,7 +226,7 @@ export function InvitePeopleDialog({ orgId, canManageBilling = false, seatAccoun
                   <span>
                     {r.error
                       ? `Invitation created, but the email to ${r.email} couldn't be sent (${r.error}). Share this link instead:`
-                      : `Invitation created — this server doesn't send email, so share this link with ${r.email}:`}
+                      : `Invitation created. This server doesn't send email, so share this link with ${r.email}:`}
                   </span>
                   {link && (
                     <div className="invite-notice-link">

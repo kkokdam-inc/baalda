@@ -4,7 +4,7 @@ import { DEPLOYED_OS_TEMPLATES } from "./deployedTemplates";
 export type { DashboardTemplate } from "./importedTemplates";
 export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [{
   id: "orbit-agentic-os",
-  name: "Orbit — Agentic OS",
+  name: "Orbit: Agentic OS",
   author: "Baalda",
   category: "Agentic OS",
   palette: ["#83e4ee", "#b6a4f7", "#080d13"],
@@ -20,7 +20,7 @@ export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [{
   },
 }, {
   id: "waystation-agentic-os",
-  name: "Waystation — Agentic OS",
+  name: "Waystation: Agentic OS",
   author: "Baalda",
   category: "Agentic OS",
   palette: ["#8edec1", "#f3c77e", "#10191d"],
@@ -36,7 +36,7 @@ export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [{
   },
 }, {
   id: "meridian-agentic-os",
-  name: "Meridian — Agentic OS",
+  name: "Meridian: Agentic OS",
   author: "Baalda",
   category: "Agentic OS",
   palette: ["#c4aff7", "#e5aac7", "#17131e"],

@@ -446,7 +446,7 @@ function GeneralTab({
         // The inline line can be scrolled out of view, and the button simply
         // returns to idle — which reads as "nothing happened". A sticky toast is
         // always visible (#85).
-        toast(`Couldn't turn on sync — ${message}`, "error");
+        toast(`Couldn't turn on sync: ${message}`, "error");
       }
     } finally {
       setBusy(false);
@@ -473,13 +473,13 @@ function GeneralTab({
           <div className="muted">
             {activeOrgName
               ? "You're viewing a local folder. Turn on sync to keep this vault on your account and across devices."
-              : "This vault lives only on this computer. Turn on sync to reach it from other devices — or invite people to it."}
+              : "This vault lives only on this computer. Turn on sync to reach it from other devices, or invite people to it."}
           </div>
 
           <div className="sync-promo">
             <h3 className="sync-promo-title">Turn on sync &amp; sharing</h3>
             <p className="sync-promo-desc">
-              Keeps the notes and folders already here — nothing to re-import.
+              Keeps the notes and folders already here, so there's nothing to re-import.
               Enables live collaboration and lets you invite people. Everyone in the
               vault can edit by default; you choose who sees what.
             </p>
@@ -510,7 +510,7 @@ function GeneralTab({
               </button>
             </div>
             {!authPending && authStatus !== "signed-in" && (
-              <div className="muted">You'll need to sign in first — this button will prompt you.</div>
+              <div className="muted">You'll need to sign in first. This button will prompt you.</div>
             )}
             {error && <div className="auth-error">{error}</div>}
             {limitNudge && (
@@ -734,7 +734,7 @@ export function UnsyncConfirmDialog({
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setError(message);
-      toast(`Couldn't make the vault local only — ${message}`, "error");
+      toast(`Couldn't make the vault local only: ${message}`, "error");
     }
   };
 
@@ -792,7 +792,7 @@ export function UnsyncConfirmDialog({
           )}
           {preview.mcpTokens > 0 && (
             <li>
-              {preview.mcpTokens} MCP token{plural(preview.mcpTokens)} stop working — AI
+              {preview.mcpTokens} MCP token{plural(preview.mcpTokens)} stop working, and AI
               clients lose access
             </li>
           )}
@@ -801,8 +801,8 @@ export function UnsyncConfirmDialog({
       {sub && (
         <p>
           {sub.currentPeriodEnd
-            ? `Pro ends on ${formatDate(sub.currentPeriodEnd)} — until then you can move the subscription to another vault from Billing.`
-            : "Pro ends when the current period does — until then you can move the subscription to another vault from Billing."}
+            ? `Pro ends on ${formatDate(sub.currentPeriodEnd)}. Until then you can move the subscription to another vault from Billing.`
+            : "Pro ends when the current period does. Until then you can move the subscription to another vault from Billing."}
         </p>
       )}
       <p>This cannot be undone. Teammates cannot get the vault back from us.</p>
@@ -860,7 +860,7 @@ function FreezeRootRow({ canManage }: { canManage: boolean }) {
         <span className="menu-row-label">
           Freeze vault root
           <span className="field-hint">
-            Stops anything new being created at the top level of this vault —
+            Stops anything new being created at the top level of this vault:
             new notes and folders have to go inside an existing folder. Applies
             to everyone, including you; only an owner or admin can turn it off.
             Nothing already at the root is moved, renamed, or hidden.
@@ -1034,7 +1034,7 @@ function TeamVaultBillingCard({
       }
       const message = e instanceof Error ? e.message : String(e);
       setError(message);
-      toast(`Couldn't move the vault — ${message}`, "error");
+      toast(`Couldn't move the vault: ${message}`, "error");
     }
   };
 
@@ -1265,7 +1265,7 @@ function BillingTab({ canManage, isSynced }: { canManage: boolean; isSynced: boo
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setError(message);
-      toast(`Couldn't move the subscription — ${message}`, "error");
+      toast(`Couldn't move the subscription: ${message}`, "error");
     }
   };
 
@@ -1281,7 +1281,7 @@ function BillingTab({ canManage, isSynced }: { canManage: boolean; isSynced: boo
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setError(message);
-      toast(`Couldn't cancel the subscription — ${message}`, "error");
+      toast(`Couldn't cancel the subscription: ${message}`, "error");
     }
   };
 
@@ -1327,7 +1327,7 @@ function BillingTab({ canManage, isSynced }: { canManage: boolean; isSynced: boo
         <button
           className="link-btn"
           disabled
-          title="Nowhere to move it — you need another vault you own that isn't already on Pro."
+          title="Nowhere to move it. You need another vault you own that isn't already on Pro."
         >
           Transfer
         </button>
@@ -1377,7 +1377,7 @@ function BillingTab({ canManage, isSynced }: { canManage: boolean; isSynced: boo
       >
         <p>
           Choose the vault that becomes Pro. It keeps the same billing period and
-          price. <strong>{transfer.sourceLabel}</strong> drops to Free — its members
+          price. <strong>{transfer.sourceLabel}</strong> drops to Free. Its members
           and notes stay, but its attachments stop syncing. Every local copy remains
           available on its device.
         </p>
@@ -1591,7 +1591,7 @@ function BillingTab({ canManage, isSynced }: { canManage: boolean; isSynced: boo
           <div className="subhead">From deleted vaults</div>
           <div className="billing-section-note">
             These subscriptions belonged to vaults that were deleted. They still
-            bill until they end — move one to a vault to use the time you've paid
+            bill until they end. Move one to a vault to use the time you've paid
             for, or cancel it now.
           </div>
           <ul className="member-list">
@@ -1752,7 +1752,7 @@ function VersioningTab({ canManage }: { canManage: boolean }) {
       const result = await useStore.getState().revertVaultToCheckpoint(cp.id);
       setConfirming(null);
       toast(
-        `Vault reverted — ${result.docsChanged} notes changed, ` +
+        `Vault reverted: ${result.docsChanged} notes changed, ` +
           `${result.docsRestored} restored, ${result.docsDeleted} removed`,
         "success",
       );
@@ -1764,7 +1764,7 @@ function VersioningTab({ canManage }: { canManage: boolean }) {
   return (
     <div className="versioning-tab">
       <div className="muted">
-        A checkpoint captures every note in this vault — content and folder
+        A checkpoint captures every note in this vault, content and folder
         structure. One is taken automatically each day the vault changes; the
         vault keeps its 5 most recent. Reverting rolls every member's vault back
         and broadcasts live.
@@ -1776,7 +1776,7 @@ function VersioningTab({ canManage }: { canManage: boolean }) {
           <div className="row invite-bar">
             <input
               type="text"
-              placeholder="Label (optional) — e.g. Before the big reorg"
+              placeholder="Label (optional), e.g. Before the big reorg"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
             />
@@ -1844,8 +1844,8 @@ function VersioningTab({ canManage }: { canManage: boolean }) {
                   now,
                 )}
               </strong>{" "}
-              ({agoFromIso(confirming.createdAt, now)}) — content, names and
-              folders — for every member, live. Notes created since then are
+              ({agoFromIso(confirming.createdAt, now)}): content, names and
+              folders, for every member, live. Notes created since then are
               moved to trash. Attachments are not reverted. A checkpoint of the
               current state is taken first, so this can be undone.
             </p>
@@ -1949,7 +1949,7 @@ function McpTab() {
       setError(message);
       // Otherwise the button just returns to idle and the user clicks again,
       // minting duplicate tokens on a server that is actually failing (#85).
-      toast(`Couldn't create the MCP token — ${message}`, "error");
+      toast(`Couldn't create the MCP token: ${message}`, "error");
     } finally {
       setBusy(false);
     }
@@ -1971,7 +1971,7 @@ function McpTab() {
   if (!hasVault) {
     return (
       <div className="muted perm-empty">
-        MCP needs an active vault — create or switch to one first.
+        MCP needs an active vault. Create or switch to one first.
       </div>
     );
   }
@@ -1979,14 +1979,19 @@ function McpTab() {
   const snippet = justCreated
     ? `claude mcp add --transport http context ${mcpUrl} \\\n  --header "Authorization: Bearer ${justCreated.token}"`
     : "";
+  // Codex reads the bearer token from an environment variable, so the token
+  // goes in the shell profile and only the variable's name in config.toml.
+  const codexSnippet = justCreated
+    ? `# In your shell profile\nexport CONTEXT_MCP_TOKEN="${justCreated.token}"\n\n# In ~/.codex/config.toml\n[mcp_servers.context]\nurl = "${mcpUrl}"\nbearer_token_env_var = "CONTEXT_MCP_TOKEN"`
+    : "";
 
   return (
     <>
       <div className="muted">
         Connect any MCP-compatible AI client to this vault. It gets the same
         access you do: read, search, create, edit and delete notes and folders.
-        Owners and admins can also manage the team's access from the same chat —
-        ask Claude or ChatGPT to share a folder with someone, make it view only,
+        Owners and admins can also manage the team's access from the same chat.
+        Ask Claude or ChatGPT to share a folder with someone, make it view only,
         or set what new members see.
       </div>
 
@@ -2025,7 +2030,7 @@ function McpTab() {
 
       {justCreated && (
         <div className="mcp-new-token">
-          <div className="subhead">Copy your token now — it won't be shown again</div>
+          <div className="subhead">Copy your token now. It won't be shown again</div>
           <div className="join-code-row">
             <code className="join-code mcp-token-value" title={justCreated.token}>
               {justCreated.token}
@@ -2037,11 +2042,18 @@ function McpTab() {
               {copied === "token" ? "Copied ✓" : "Copy"}
             </button>
           </div>
-          <div className="muted">Example — add it to Claude Code:</div>
+          <div className="muted">To add it to Claude Code:</div>
           <div className="join-code-row">
             <code className="mcp-snippet">{snippet}</code>
             <button className="link-btn" onClick={() => void copy(snippet, "snippet")}>
               {copied === "snippet" ? "Copied ✓" : "Copy"}
+            </button>
+          </div>
+          <div className="muted">Or add it to Codex:</div>
+          <div className="join-code-row">
+            <code className="mcp-snippet">{codexSnippet}</code>
+            <button className="link-btn" onClick={() => void copy(codexSnippet, "codex")}>
+              {copied === "codex" ? "Copied ✓" : "Copy"}
             </button>
           </div>
           <button className="link-btn" onClick={() => setJustCreated(null)}>
@@ -2054,7 +2066,7 @@ function McpTab() {
       <div className="subhead">Connections</div>
       <div className="muted">
         Every token is a connection into this vault. Each reaches the same{" "}
-        {tools.length || ""} tools, gated by your access — expand one to see them,
+        {tools.length || ""} tools, gated by your access. Expand one to see them,
         how active it is, and how much it's been used.
       </div>
 
@@ -2239,7 +2251,7 @@ function ImportExportTab() {
       <section className="io-section">
         <h3 className="io-heading">Import</h3>
         <p className="io-desc">
-          Bring existing files and folders into this vault — any format. Markdown and text
+          Bring existing files and folders into this vault, in any format. Markdown and text
           become notes; everything else is kept as-is, with its folder structure. Existing
           names are never overwritten.
         </p>

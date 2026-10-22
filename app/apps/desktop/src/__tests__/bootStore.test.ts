@@ -236,6 +236,27 @@ describe("initAuth — detached, so it must never land late", () => {
   });
 });
 
+describe("initAuth — a session read started beside the update gate", () => {
+  it("uses the session already in flight instead of reading it again", async () => {
+    // Launch starts `authManager.init()` before the update gate and hands the
+    // promise in; nothing lands in the store until initAuth itself runs.
+    authManager.init.mockClear();
+    api.listOrganizations.mockResolvedValue([{ id: ORG, name: "A" }]);
+    const held = gate();
+    const sessionRead = held.waited.then(() => session());
+
+    const restoring = useStore.getState().initAuth({ session: sessionRead as never });
+    await flush();
+    expect(useStore.getState().authStatus).not.toBe("signed-in");
+
+    held.open();
+    await restoring;
+    await flush();
+    expect(authManager.init).not.toHaveBeenCalled();
+    expect(useStore.getState().authStatus).toBe("signed-in");
+  });
+});
+
 describe("enableSyncForVault — background returns at the prime", () => {
   it("resolves as soon as sync primes, with syncEnabled on", async () => {
     // This is what un-gates the landing: `enable` runs the reconcile (minutes on

@@ -77,7 +77,7 @@ import { isSilentRelease, notesForVersion, releaseNoteLines } from "./lib/releas
 import { runConfetti } from "./lib/celebrate/celebrate";
 import { viewerFor } from "./lib/formats";
 import { effectiveHomeNote, homeSidebarVisitKey } from "./lib/pins";
-import { effectiveLockForPath, lockScopesByPath } from "./lib/locks";
+import { lockBlocksCaller, lockScopesByPath } from "./lib/locks";
 import { onOpenFileRequest } from "./lib/openFileRequest";
 import { editorMeasureStyle } from "./lib/editorMeasure";
 import { noteLabel } from "./lib/notePath";
@@ -377,7 +377,7 @@ function VaultRootMissingBanner() {
     try {
       await fn();
     } catch (e) {
-      toast(`Couldn't recover the vault folder — ${e instanceof Error ? e.message : String(e)}`, "error");
+      toast(`Couldn't recover the vault folder: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {
       setBusy(false);
     }
@@ -640,7 +640,7 @@ function VaultFolderPrompt() {
         ) : (
           <p className="wf-desc">
             Choose the local folder this vault syncs to. Each vault keeps its
-            own folder — separate from your other vaults.
+            own folder, separate from your other vaults.
           </p>
         )}
         <div className="vault-folder-actions">
@@ -784,8 +784,8 @@ function UpdateGate({ launchVersion = null }: { launchVersion?: string | null })
                 : update.phase === "available"
                   ? "Starting the download…"
                   : update.phase === "downloading"
-                  ? `Downloading v${update.version}${pct != null ? ` — ${pct}%` : "…"}`
-                  : "Installing — the app will restart itself…"}
+                  ? `Downloading v${update.version}${pct != null ? `: ${pct}%` : "…"}`
+                  : "Installing. The app will restart itself…"}
             </p>
             {/* A determinate bar when the server sent a content length, an
                 indeterminate sweep when it didn't — a bar that fills to an
@@ -810,8 +810,8 @@ function UpdateGate({ launchVersion = null }: { launchVersion?: string | null })
             {required ? (
               <p>
                 {BRAND_NAME} couldn&rsquo;t install the update to <strong>v{required}</strong>
-                {"message" in update && update.message ? ` — ${update.message}` : ""}. It tried
-                twice on its own. Check your connection and try again — your notes stay right
+                {"message" in update && update.message ? ` (${update.message})` : ""}. It tried
+                twice on its own. Check your connection and try again. Your notes stay right
                 where they are, on your disk.
               </p>
             ) : (
@@ -938,7 +938,7 @@ function WhatsNewModal() {
             <h2 className="whats-new-title">What&rsquo;s New</h2>
             <span className="whats-new-version">v{updated.version}</span>
             <p className="whats-new-sub">
-              {BRAND_NAME} updated itself to the latest version — here&rsquo;s what
+              {BRAND_NAME} updated itself to the latest version. Here&rsquo;s what
               changed.
             </p>
           </div>
@@ -965,7 +965,7 @@ function WhatsNewModal() {
             </ul>
           )}
           <button className="primary whats-new-cta" autoFocus onClick={close}>
-            Nice — let&rsquo;s go
+            Nice, let&rsquo;s go
           </button>
         </div>
       </div>
@@ -991,6 +991,7 @@ function SyncIndicator({
   const lastSyncedAt = useStore((s) => s.lastSyncedAt);
   const pending = useStore((s) => s.syncPending);
   const progress = useStore((s) => s.syncProgress);
+  const vaultStatus = useStore((s) => s.vaultSyncStatus);
   const rootMissing = useStore((s) => s.structureNotice.rootMissing);
   const syncPause = useStore((s) => s.syncPause);
   // The folder is gone (#228) or the shrink brake holds our writes (#252):
@@ -1011,11 +1012,9 @@ function SyncIndicator({
       pending={pending}
       progress={progress}
       noteOpen={noteOpen}
+      vaultStatus={vaultStatus}
       rootMissing={rootMissing}
       pause={syncPause}
-      // A run that could not proceed carries its own remedy: one click re-pulls
-      // the registry and re-runs the content pass for everything unconfirmed.
-      onRetry={syncEnabled ? () => void syncManager.retrySync() : undefined}
     />
   );
 }
@@ -1115,7 +1114,7 @@ export default function App() {
     const home = effectiveHomeNote(s);
     if (!home || s.activeVirtualTab || s.openNote?.path !== home.path) return null;
     if (["read-only", "no-access", "deleted"].includes(String(s.docSyncState[home.id]))) return null;
-    return effectiveLockForPath(lockScopesByPath(s.tree, s.locks, s.session?.user.id, s.lifts), home.path) ? null : home.path;
+    return lockBlocksCaller(lockScopesByPath(s.tree, s.locks, s.session?.user.id, s.lifts), home.path) ? null : home.path;
   });
   // Home opens normally unless its sidebar navigation action explicitly requests full width.
   const currentHomePath = useStore((s) => {
@@ -1247,6 +1246,15 @@ export default function App() {
       // Baalda"); no update, an offline launch or a check slower than
       // LAUNCH_CHECK_TIMEOUT_MS falls straight through. Not in a dev build —
       // see the note on the poll below.
+      //
+      // Only the session READ overlaps the gate: `authManager.init()` (keychain
+      // + one round trip) touches no store state and starts no sync. Landing the
+      // session in the store is what arms the reconcile and the membership
+      // checks, so that still waits for the gate below.
+      const sessionRead = authManager.init();
+      // Handled where it is consumed (initAuth); this only keeps an early
+      // rejection from surfacing as unhandled while the gate runs.
+      sessionRead.catch(() => {});
       if (!import.meta.env.DEV) {
         await launchUpdateGate({ onUpdating: (v) => setLaunchUpdating(v) });
         setLaunchUpdating(null);
@@ -1257,7 +1265,7 @@ export default function App() {
       // a sign-in/sign-out the user performs meanwhile still wins.
       void useStore
         .getState()
-        .initAuth()
+        .initAuth({ session: sessionRead })
         .catch((e) => console.error("auth init failed", e));
       // Check for updates on a background poll too (the launch check ran
       // above), and install what we find WITHOUT asking: a found release is
@@ -1454,7 +1462,7 @@ export default function App() {
         const vault = useStore.getState().vault;
         if (!vault || vault.epoch !== e.epoch) return;
         perf.mark("index-ready");
-        if (!e.ok) toast("Couldn't finish indexing this vault — search and backlinks may be incomplete.", "error");
+        if (!e.ok) toast("Couldn't finish indexing this vault. Search and backlinks may be incomplete.", "error");
         void useStore.getState().refreshTitles();
         void useStore.getState().refreshBacklinks();
       });
@@ -1707,6 +1715,31 @@ export default function App() {
               <TalkButton />
               {/* Same gate as history: a link is a doc_id, so it only exists for a
                   note the server knows about. */}
+              {/* Version history straight from the header: the panel's Versions
+                  tab for the open note. Same gate as the Versions content. */}
+              {versionDocId && !isPreview && (
+                <button
+                  className={`icon-btn history-btn${versionsTabOpen ? " active" : ""}`}
+                  title="Version history"
+                  aria-label="Version history"
+                  aria-pressed={versionsTabOpen}
+                  onClick={() => useStore.getState().toggleVersionsPanel()}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 12a9 9 0 1 0 2.6-6.4" />
+                    <path d="M3 4v4h4" />
+                    <path d="M12 8v4l3 2" />
+                  </svg>
+                </button>
+              )}
               {versionDocId && !isPreview && <ShareNoteButton docId={versionDocId} />}
               {document.documentElement.dataset.platform !== "windows" && (
                 <GraphButton onClick={() => setGraphOpen(true)} />

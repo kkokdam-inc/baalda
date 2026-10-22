@@ -254,7 +254,7 @@ export function AuthDialog({
   const connectTo = async (raw: string) => {
     const url = normalizeServerUrl(raw);
     if (!url) {
-      setServerError("That doesn't look like a server address — try https://notes.example.com");
+      setServerError("That doesn't look like a server address. Try https://notes.example.com");
       return;
     }
     setServerError(null);
@@ -493,7 +493,7 @@ export function AuthDialog({
                 <span className="server-option-text">
                   <span className="server-option-title">Your own server</span>
                   <span className="server-option-hint">
-                    Self-hosted — enter the address your team gave you
+                    Self-hosted: enter the address your team gave you
                   </span>
                 </span>
                 <span className="server-option-chevron">
@@ -567,8 +567,8 @@ export function AuthDialog({
             {invitePrompt && (
               <p className="auth-invite-lede">
                 <strong>{invitePrompt.inviterName ?? "A teammate"}</strong> invited you to
-                join <strong>{invitePrompt.organizationName}</strong>. Sign in — or create an
-                account — with <strong>{invitePrompt.email}</strong> to accept.
+                join <strong>{invitePrompt.organizationName}</strong>. Sign in (or create an
+                account) with <strong>{invitePrompt.email}</strong> to accept.
               </p>
             )}
             {mode !== "reset" && (
@@ -625,7 +625,7 @@ export function AuthDialog({
                 <div className="auth-reset-done">
                   <p>
                     Reset link sent to <strong>{resetSent}</strong>. Check your inbox (and
-                    spam) — the link is valid for one hour. Setting a new password there
+                    spam). The link is valid for one hour. Setting a new password there
                     brings you back here to sign in.
                   </p>
                   <button type="button" className="link-btn" onClick={backToSignIn}>

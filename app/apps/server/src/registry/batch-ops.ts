@@ -445,7 +445,7 @@ export async function registerFolder(
     return {
       status: "error",
       code: "root_frozen",
-      message: "This vault's root is frozen — create this inside a folder instead.",
+      message: "This vault's root is frozen. Create this inside a folder instead.",
     };
   }
 
@@ -712,7 +712,7 @@ async function registerNotesWithinQuota(ctx: RegisterCtx, inputs: NoteInput[], r
         results[index] = {
           status: "error",
           code: "root_frozen",
-          message: "This vault's root is frozen — create this inside a folder instead.",
+          message: "This vault's root is frozen. Create this inside a folder instead.",
         };
         continue;
       }
@@ -1123,7 +1123,7 @@ export async function registerFile(
     return {
       status: "error",
       code: "root_frozen",
-      message: "This vault's root is frozen — create this inside a folder instead.",
+      message: "This vault's root is frozen. Create this inside a folder instead.",
     };
   }
 

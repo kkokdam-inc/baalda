@@ -100,7 +100,7 @@ export function plainHttpHint(url: string): string | null {
   if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1") {
     return null;
   }
-  return "Installed builds can only use plain http on localhost — this server needs https.";
+  return "Installed builds can only use plain http on localhost. This server needs https.";
 }
 
 /**

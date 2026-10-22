@@ -123,7 +123,7 @@ export function AccountLapsedNotice() {
       await useStore.getState().refreshLocks();
       toast("Team plan resumed");
     } catch (e) {
-      toast(`Couldn't resume the plan — ${e instanceof Error ? e.message : String(e)}`, "error");
+      toast(`Couldn't resume the plan: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {
       setBusy(false);
     }

@@ -545,16 +545,61 @@ export async function appendUpdate(
   // never saw. A vector that is trusted and wrong withholds ops from a client
   // silently, which is the one failure mode this cache must never have.
 
+  // Deciding whether to compact used to `count(*)` the log on EVERY update. The
+  // in-process estimate below skips that count when it cannot change the
+  // answer, and asks Postgres whenever it might.
+  const est = logEstimates.get(docId);
+  if (est && est.n + 1 <= threshold && est.sinceCount + 1 < RECOUNT_EVERY) {
+    est.n += 1;
+    est.sinceCount += 1;
+    return { compacted: false };
+  }
+
   const { rows } = await db.query<{ count: string }>(
     "SELECT count(*)::text AS count FROM doc_updates WHERE doc_id = $1",
     [docId],
   );
   const count = Number.parseInt(rows[0]?.count ?? "0", 10);
   if (count > threshold) {
+    // Forget the estimate: compaction truncates the log, and whatever survives
+    // it (an append racing the merge) is counted fresh on the next write.
+    logEstimates.delete(docId);
     await compact(docId, db);
     return { compacted: true };
   }
+  rememberEstimate(docId, count);
   return { compacted: false };
+}
+
+/**
+ * Per-doc estimate of the `doc_updates` row count, so {@link appendUpdate} need
+ * not `count(*)` the log on every write. Seeded from a real count, then bumped
+ * once per append made through THIS process.
+ *
+ * Every insert into `doc_updates` goes through `appendUpdate`, and every other
+ * write to the table only DELETES (compaction, CRDT reset, trash purge, vault
+ * unsync), so in one process the estimate is either exact or too HIGH — and a
+ * high estimate only causes an early recount, never a missed compaction.
+ * Compaction fires on exactly the append it always did: once the estimate says
+ * the next row could cross the threshold, the real count decides.
+ *
+ * The one way it runs LOW is another server instance appending to the same doc
+ * (HA mode). Recounting every {@link RECOUNT_EVERY} appends bounds that: at worst
+ * a log grows a few rows past the threshold before one instance notices, and is
+ * then compacted as before. Bounded in size; losing an entry just means a count.
+ */
+const logEstimates = new Map<string, { n: number; sinceCount: number }>();
+const RECOUNT_EVERY = 8;
+const MAX_LOG_ESTIMATES = 50_000;
+
+function rememberEstimate(docId: string, n: number): void {
+  logEstimates.delete(docId);
+  if (logEstimates.size >= MAX_LOG_ESTIMATES) {
+    // Oldest entry by insertion order; Map iteration order makes this LRU-ish.
+    const oldest = logEstimates.keys().next().value;
+    if (oldest !== undefined) logEstimates.delete(oldest);
+  }
+  logEstimates.set(docId, { n, sinceCount: 0 });
 }
 
 /**

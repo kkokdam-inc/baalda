@@ -171,7 +171,7 @@ export class PostgresBlobStore implements BlobStore {
   async presignMultipart(_input: PresignMultipartInput): Promise<PresignedMultipart> {
     throw new BlobStoreError(
       "not_supported",
-      "the postgres provider has no multipart upload — its whole ceiling is one MAX_BLOB_BYTES body",
+      "the postgres provider has no multipart upload; its whole ceiling is one MAX_BLOB_BYTES body",
     );
   }
 

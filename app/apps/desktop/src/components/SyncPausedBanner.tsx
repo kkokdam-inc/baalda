@@ -31,7 +31,7 @@ export function SyncPausedBannerView({
     <Banner show={show} className="not-syncing-banner" role="status">
       {pause && (
         <span>
-          <strong>{syncPauseText(pause)}</strong> — your edits are safe on this device and
+          <strong>{syncPauseText(pause)}</strong>. Your edits are safe on this device and
           will sync when the pause ends{remaining ? ` (in ${remaining})` : ""} or a vault
           owner or admin releases it.
         </span>

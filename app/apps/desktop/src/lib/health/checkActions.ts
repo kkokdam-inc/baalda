@@ -159,7 +159,7 @@ function judge(action: CheckAction, item: VaultCheckItem): string | null {
     case "rename-legal": {
       const to = suggestLegalPath(item.path);
       if (to === null) {
-        return "the offending name is a folder, or nothing legal is left of it — rename it yourself";
+        return "the offending name is a folder, or nothing legal is left of it. Rename it yourself";
       }
       return null;
     }
@@ -427,12 +427,12 @@ export async function runCheckAction(
           if (!(await deps.isFile(target.path))) {
             out.skipped.push({
               path: target.path,
-              reason: "this is a folder — rename it in the sidebar",
+              reason: "this is a folder. Rename it in the sidebar",
             });
           } else if (await deps.isFile(to)) {
             out.skipped.push({
               path: target.path,
-              reason: `\`${basename(to)}\` is taken — rename it yourself`,
+              reason: `\`${basename(to)}\` is taken. Rename it yourself`,
             });
           } else {
             await deps.rename(target.path, to);
@@ -463,7 +463,7 @@ export function outcomeSummary(
   outcome: CheckActionOutcome,
   plan: CheckActionPlan,
 ): string {
-  if (outcome.cancelled) return "Cancelled — nothing changed";
+  if (outcome.cancelled) return "Cancelled. Nothing changed";
   const failed = outcome.errors.length;
   const parts: string[] = [];
   let note = outcome.note;

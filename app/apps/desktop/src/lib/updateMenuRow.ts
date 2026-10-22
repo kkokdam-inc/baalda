@@ -49,7 +49,7 @@ export function updateCheckToast(state: UpdateState): { text: string; tone: Toas
     case "pending":
       return { text: "An update is on its way.", tone: "neutral" };
     case "available":
-      return { text: `Version ${state.version} found — starting the download…`, tone: "neutral" };
+      return { text: `Version ${state.version} found. Starting the download…`, tone: "neutral" };
     case "error":
       return { text: `Couldn't check for updates: ${state.message}`, tone: "error" };
     case "failed":

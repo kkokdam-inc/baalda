@@ -97,11 +97,11 @@ export function NotSyncingBannerView({
             {reason === "vault-no-access"
               ? "You no longer have access to this vault"
               : "You no longer have access to this note"}
-          </strong>{" "}— changes here are not syncing.
+          </strong>: changes here are not syncing.
         </span>
       ) : (
         <span>
-          <strong>Signed out</strong> — your changes are not syncing. Edits stay on this
+          <strong>Signed out</strong>. Your changes are not syncing. Edits stay on this
           device until you sign in.
         </span>
       )}

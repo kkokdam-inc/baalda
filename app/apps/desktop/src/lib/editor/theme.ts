@@ -774,19 +774,9 @@ export const editorThemeSpec: Record<string, Record<string, string>> = {
   ".cm-note-title": {
     paddingBottom: "var(--inline-title-gap)",
   },
-  // Mirrors the selection wash onto the title while a selection reaches the
-  // start of the document (see `titleSelectionMirror` in noteHeader.ts). Same
-  // colour as `.cm-selectionBackground` above.
-  // Square bottom + a shadow strip the height of the first line's leading
-  // (`--title-sel-extend`, measured by the plugin) so the title's wash and the
-  // body's read as ONE selection. An outer box-shadow is never painted under
-  // its own box, so the translucent wash does not double up anywhere.
-  ".cm-note-title.is-selected": {
-    backgroundColor: "var(--editor-selection-bg)",
-    borderRadius: "var(--radius-sm) var(--radius-sm) 0 0",
-    boxShadow: "0 var(--title-sel-extend, 0px) 0 var(--editor-selection-bg)",
-  },
   ".inline-title-wrap": {
+    // Positioned so the remote title carets can sit on the input's offsets.
+    position: "relative",
     display: "flex",
     flexDirection: "column",
     gap: "var(--sp-1)",
@@ -805,6 +795,16 @@ export const editorThemeSpec: Record<string, Record<string, string>> = {
     fontWeight: "var(--inline-title-weight)",
     lineHeight: "var(--lh-tight)",
     color: "var(--inline-title-color)",
+  },
+  // Teammates' carets in the title (see InlineTitle). Children reuse the body's
+  // `.cm-remoteCaret` styles and are placed with `transform`, like the layer's.
+  ".inline-title-carets": {
+    position: "absolute",
+    top: "0",
+    left: "0",
+    width: "0",
+    height: "0",
+    pointerEvents: "none",
   },
   ".inline-title-input::placeholder": {
     color: "var(--inline-title-placeholder)",

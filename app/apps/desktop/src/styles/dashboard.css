@@ -19,7 +19,7 @@
   .dashboard-header-actions .dashboard-agent-launch-status { font-size:0; gap:0; margin-left:5px; }
   .header-actions { gap:4px; padding-inline:6px; }
   .header-actions .sync-badge { position:relative; justify-content:center; width:26px; height:26px; padding:0; gap:0; }
-  .header-actions .sync-badge-label, .header-actions .sync-retry-cta { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  .header-actions .sync-badge-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 }
 .dashboard-toolbar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
 .dashboard-toolbar-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }

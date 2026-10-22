@@ -200,7 +200,7 @@ function diskDeleteCap(mappedCount: number): number {
 const FOLDER_MOVE_MIN_RATIO = 0.8;
 /** The Health row reason for a note held by an unanswered bulk delete. */
 export const DELETE_DECISION_REASON =
-  "removed from this folder in a bulk delete — it stays for your team and will be restored here";
+  "removed from this folder in a bulk delete. It stays for your team and will be restored here";
 /** How long an appeared folder stays a candidate for a move's new half. */
 const FOLDER_CANDIDATE_TTL_MS = 10_000;
 
@@ -1113,13 +1113,13 @@ export class SyncManager implements InboundHost {
         this.note("info", "connect", `Connected to ${this.serverHost()}`);
         return;
       case "offline":
-        this.note("warn", "offline", "Connection lost — reconnecting");
+        this.note("warn", "offline", "Connection lost. Reconnecting");
         return;
       case "read-only":
         this.note(
           "info",
           "read-only",
-          "You have view-only access here — your edits stay on this device",
+          "You have view-only access here. Your edits stay on this device",
         );
         return;
       case "no-access":
@@ -1134,7 +1134,7 @@ export class SyncManager implements InboundHost {
         this.note("error", "too-large", "The open note is too large for the server to accept");
         return;
       case "error":
-        this.note("warn", "error", "The server could not be reached — retrying");
+        this.note("warn", "error", "The server could not be reached. Retrying");
         return;
       default:
         // "connecting" — a handshake in progress is not news.
@@ -1157,7 +1157,7 @@ export class SyncManager implements InboundHost {
     this.loggedPhase = phase;
     if (phase == null || phase === "idle") return;
     if (phase === "removing") {
-      this.note("info", "run-start", "Updating access — checking local copies");
+      this.note("info", "run-start", "Updating access: checking local copies");
       return;
     }
     if (phase === "registering" || phase === "uploading" || phase === "downloading") {
@@ -1169,7 +1169,7 @@ export class SyncManager implements InboundHost {
     }
     if (phase === "done") {
       const confirmed = p ? Math.max(0, p.done - p.failed) : 0;
-      this.note("info", "run-done", `Sync finished — ${confirmed} notes confirmed`);
+      this.note("info", "run-done", `Sync finished: ${confirmed} notes confirmed`);
       return;
     }
     // "error" — the run ended without getting everything through.
@@ -1180,7 +1180,7 @@ export class SyncManager implements InboundHost {
       this.note(
         "error",
         "run-failed",
-        "Sync could not finish — the app never reached the server",
+        "Sync could not finish. The app never reached the server",
       );
     }
   }
@@ -1204,7 +1204,7 @@ export class SyncManager implements InboundHost {
           : f.kind === "shrink-held"
             ? "shrink-held"
             : "push-failed",
-      `${f.relPath} — ${f.reason}`,
+      `${f.relPath}: ${f.reason}`,
       { docId: f.docId, path: f.relPath },
     );
   }
@@ -1214,7 +1214,7 @@ export class SyncManager implements InboundHost {
     this.note(
       "error",
       "register-failed",
-      `${f.path} — ${f.reason}${f.code ? ` (${f.code})` : ""}`,
+      `${f.path}: ${f.reason}${f.code ? ` (${f.code})` : ""}`,
       { docId: f.docId, path: f.path },
     );
   }
@@ -2036,8 +2036,8 @@ export class SyncManager implements InboundHost {
       "warn",
       "revoked",
       trashedTo
-        ? `Access to ${path} was removed — a copy is in .context/trash`
-        : `Access to ${path} was removed — it was taken off this device`,
+        ? `Access to ${path} was removed. A copy is in .context/trash`
+        : `Access to ${path} was removed. It was taken off this device`,
       { docId, path },
     );
   }
@@ -2095,7 +2095,7 @@ export class SyncManager implements InboundHost {
   handleServerReauth(scope: VaultScope): void {
     if (!scope.isCurrent()) return;
     this.aclChangedAt = Date.now();
-    this.note("info", "reauth", "Permissions changed — re-checking access");
+    this.note("info", "reauth", "Permissions changed. Re-checking access");
     // An access change can be exactly what was failing: retry everything now.
     this.retryBackoff.clearAll();
     // Two things follow from "the ACL moved". The open note re-mints its token so
@@ -2403,7 +2403,7 @@ export class SyncManager implements InboundHost {
       this.retryBackoff.clear(mapping.docId);
       this.invalidatedFailures.delete(mapping.docId);
       this.localChanges.set(mapping.docId, relPath);
-      this.note("info", "push-queued", "Changed on disk while closed — checking it against the server", {
+      this.note("info", "push-queued", "Changed on disk while closed. Checking it against the server", {
         docId: mapping.docId,
         path: relPath,
       });
@@ -2695,7 +2695,7 @@ export class SyncManager implements InboundHost {
         this.note(
           "info",
           "disk-delete",
-          `${d.relPath} was deleted on this device — removed from the server for everyone`,
+          `${d.relPath} was deleted on this device and removed from the server for everyone`,
           { docId: d.docId, path: d.relPath },
         );
         // The OPEN note keeps its bridge deliberately. The editor is still
@@ -2870,14 +2870,14 @@ export class SyncManager implements InboundHost {
       items.map((d) => d.relPath).slice(0, 10),
     );
     toast(
-      `${items.length} notes disappeared from disk at once — they were NOT removed from the server. ` +
+      `${items.length} notes disappeared from disk at once. They were NOT removed from the server. ` +
         `If the folder was unmounted or checked out, reopening the vault restores them.`,
       "error",
     );
     this.note(
       "warn",
       "bulk-delete-refused",
-      `${items.length} notes vanished from this folder at once — they were left on the server ` +
+      `${items.length} notes vanished from this folder at once. They were left on the server ` +
         `in case the folder was unmounted or checked out`,
     );
     for (const d of items) {
@@ -2886,7 +2886,7 @@ export class SyncManager implements InboundHost {
         path: d.relPath,
         docId: d.docId,
         reason:
-          `${items.length} notes vanished from disk in one window (cap ${cap}) — ` +
+          `${items.length} notes vanished from disk in one window (cap ${cap}), so they were ` +
           `left on the server deliberately`,
         code: null,
       });
@@ -3010,7 +3010,7 @@ export class SyncManager implements InboundHost {
     // The file at the new path may hold edits made in the same breath as the
     // rename, and the note's row moved, so both surfaces need telling.
     this.localChanges.set(docId, to);
-    this.note("info", "push-queued", "Renamed on disk — re-sending it under the new name", {
+    this.note("info", "push-queued", "Renamed on disk. Re-sending it under the new name", {
       docId,
       path: to,
     });
@@ -3268,7 +3268,7 @@ export class SyncManager implements InboundHost {
       edited++;
     }
     if (edited > 0) this.armLocalChangeDrain(scope, LOCAL_CHANGE_DEBOUNCE_MS);
-    this.note("info", "folder-moved", `${from} was moved to ${to} on this device — kept as a move for everyone`, {
+    this.note("info", "folder-moved", `${from} was moved to ${to} on this device, kept as a move for everyone`, {
       path: to,
     });
     // The open note and the tabs are re-pointed by prefix, like an inbound move.
@@ -3329,7 +3329,7 @@ export class SyncManager implements InboundHost {
     // An unanswered bulk delete is now the unmounted case: never asked.
     this.deleteDecision = null;
     this.deleteDecisionIds = new Set();
-    this.note("warn", "vault-root-missing", "The vault folder is missing — restore it here or locate where it moved");
+    this.note("warn", "vault-root-missing", "The vault folder is missing. Restore it here or locate where it moved");
     this.emitStructureNotice();
   }
 
@@ -3475,7 +3475,7 @@ export class SyncManager implements InboundHost {
     this.note(
       "warn",
       "bulk-delete-held",
-      `${this.deleteDecision.length} notes were removed from this folder at once — they stay for the team and will be restored here`,
+      `${this.deleteDecision.length} notes were removed from this folder at once. They stay for the team and will be restored here`,
     );
     this.emitStructureNotice();
   }
@@ -4330,6 +4330,24 @@ export class SyncManager implements InboundHost {
     return (this.uploader?.isRunning() ?? false) || this.batchPushing;
   }
 
+  /**
+   * Is this doc's FILE still waiting to be created by a bootstrap page or the
+   * vault channel's backfill (a deferred placeholder, see `deferredArrival.ts`
+   * and `registry.deferredPathFor`)?
+   *
+   * Such a doc is mapped and not yet `pushed`, so every "never pushed" work list
+   * used to queue it — and the push then read a file that is not on disk yet
+   * (one Rust ERROR per doc, thousands on a shared-vault join). It has no local
+   * content to push: the server is about to hand it over. It becomes ordinary
+   * work again once the delivery (or the placeholder fallback) clears the
+   * pending entry. A file missing for any OTHER reason is not pending, so it
+   * keeps today's handling (the disk-delete drain, and a never-pushed doc keeps
+   * its only copy).
+   */
+  private creationPending(docId: string): boolean {
+    return !!this.registry.deferredPathFor?.(docId);
+  }
+
   private contentWorkList(): Array<{ docId: string; relPath: string }> {
     const open = this.docStore?.suppressedDoc() ?? null;
     return this.registry
@@ -4337,6 +4355,7 @@ export class SyncManager implements InboundHost {
       .filter(
         (n) =>
           n.docId !== open &&
+          !this.creationPending(n.docId) &&
           // Settled as "nothing anywhere", or failed for a reason a retry can't
           // fix — neither is work (see the field comments).
           !this.emptyEverywhere.has(n.docId) &&
@@ -4782,6 +4801,12 @@ export class SyncManager implements InboundHost {
         keep.add(docId);
         continue;
       }
+      // A server-only note whose placeholder is deferred until its bootstrap
+      // page lands is not on disk yet, and the server holds nothing for it:
+      // there is nothing here to push. Probing it only read a missing file
+      // (one Rust ERROR line per doc, thousands on a shared-vault join).
+      // Neither kept nor settled: the next connect asks again once it exists.
+      if (this.registry.deferredPathFor?.(docId)) continue;
       toProbe.push({ docId, relPath });
     }
     if (toProbe.length === 0) return keep;
@@ -4887,6 +4912,13 @@ export class SyncManager implements InboundHost {
     } catch {
       // No stat (older Rust core, a racing delete, a fake in a test): fall
       // through to the read, which answers the same question the slow way.
+      // A file that is simply not there answers "not empty" (the verdict a
+      // failed read gave) without the read, which Rust logs as an ERROR.
+      try {
+        if (!(await ipc.noteExists(relPath, scope.vaultEpoch))) return false;
+      } catch {
+        /* no answer: the read decides, as before */
+      }
     }
     if (!scope.isCurrent()) return false;
     return this.registry.isNoteEmptyOnDisk(relPath);
@@ -5614,6 +5646,8 @@ export class SyncManager implements InboundHost {
       .filter(
         (n) =>
           n.docId !== open &&
+          // Not on disk yet: the bootstrap / backfill is creating it.
+          !this.creationPending(n.docId) &&
           // Settled as "nothing anywhere", permanently refused, or already
           // owned by the per-doc follow-up — none of them are work here.
           !this.emptyEverywhere.has(n.docId) &&
@@ -5756,7 +5790,7 @@ export class SyncManager implements InboundHost {
     const progress = this.progress;
     if (!progress || docIds.length === 0) return;
     const notes = docIds
-      .filter((docId) => !this.backedOff(docId))
+      .filter((docId) => !this.backedOff(docId) && !this.creationPending(docId))
       .map((docId) => ({ docId, relPath: this.registry.pathForDocId(docId) }))
       .filter((n): n is { docId: string; relPath: string } => n.relPath != null);
     if (notes.length === 0) return;
@@ -5839,7 +5873,7 @@ export class SyncManager implements InboundHost {
     this.note(
       "error",
       "server-too-old",
-      "Update your Baalda server — this app needs its bulk sync routes",
+      "Update your Baalda server. This app needs its bulk sync routes",
     );
     this.progress?.phase("error");
     this.progress?.flush();
@@ -5923,7 +5957,9 @@ export class SyncManager implements InboundHost {
 
     const uploader: ContentUploader = new ContentUploader({
       vaultId,
-      notes: this.registry.mappedNotes(),
+      // A doc whose file the bootstrap / backfill has not created yet is not
+      // work: its `!pushed` would queue it and the run would read a missing file.
+      notes: this.registry.mappedNotes().filter((n) => !this.creationPending(n.docId)),
       deps: {
         // Hold the doc in the hot tier (pinned) for the duration of its push, so
         // there is exactly ONE bridge for it even while the background feed is
@@ -6126,16 +6162,15 @@ export class SyncManager implements InboundHost {
     this.downloadPhase = false;
     this.channelStalled = false;
     this.clearChannelWatchdog();
-    const uploadFailures = this.uploader?.failedDocs().length ?? 0;
     const clean =
-      uploadFailures === 0 &&
-      // The bulk engine's own refusals count exactly as much as the per-doc
-      // ones: a bootstrap page that could not be applied, or a doc the batch
-      // push was denied, leaves the vault partly unsynced either way.
-      this.bulkFailures.size === 0 &&
+      // Per-doc, bulk and permanent failures, judged exactly as Activity lists
+      // them (see `reportableContentFailures`): a failure a later push
+      // confirmed, a superseded attempt or a transient error still retrying
+      // does not make the vault unsynced. A bulk refusal or a permanent one
+      // (too large) still does.
+      this.reportableContentFailures().length === 0 &&
       !this.serverTooOld &&
       this.pullFailure() == null &&
-      this.permanentFailures.size === 0 &&
       !this.registry.hasFailures() &&
       this.registry.limitCode() == null;
     progress.phase(clean ? "done" : "error");
@@ -6219,20 +6254,17 @@ export class SyncManager implements InboundHost {
     return notUploaded > 0 ? { ...p, notUploaded } : p;
   }
 
-  /** Everything the current run could not sync — registry rows and note content. */
-  syncFailures(): {
-    registry: ReturnType<VaultRegistry["failures"]>;
-    // `permanent` controls retry scheduling; `kind` carries the diagnosis. The
-    // Health page must not infer "too large" from terminal scheduling metadata.
-    content: Array<{
-      docId: string;
-      relPath: string;
-      reason: string;
-      permanent?: boolean;
-      kind?: UploadFailure["kind"];
-    }>;
-    limitCode: string | null;
-  } {
+  /**
+   * The content failures that are still TRUE, as one list: what Activity shows
+   * AND what decides whether a run ended clean ({@link completeRun}). Raw
+   * `uploader.failedDocs()` / `bulkFailures` also hold failures a later push
+   * already confirmed (`failureGrace` settled), attempts superseded by a
+   * re-queue (`invalidatedFailures`, `localChanges`) and transient errors still
+   * inside their retry grace. Counting those made a run end in `error` (the
+   * old "Sync incomplete" pill) while Activity listed nothing and every note
+   * was synced.
+   */
+  private reportableContentFailures(): UploadFailure[] {
     // Permanent failures are remembered across runs (see the field), so they are
     // reported from there; the live uploader's list covers this run's transient
     // ones. A doc in both is listed once.
@@ -6263,6 +6295,24 @@ export class SyncManager implements InboundHost {
       if (this.localChanges.has(f.docId)) continue;
       content.push(f);
     }
+    return content;
+  }
+
+  /** Everything the current run could not sync — registry rows and note content. */
+  syncFailures(): {
+    registry: ReturnType<VaultRegistry["failures"]>;
+    // `permanent` controls retry scheduling; `kind` carries the diagnosis. The
+    // Health page must not infer "too large" from terminal scheduling metadata.
+    content: Array<{
+      docId: string;
+      relPath: string;
+      reason: string;
+      permanent?: boolean;
+      kind?: UploadFailure["kind"];
+    }>;
+    limitCode: string | null;
+  } {
+    const content = this.reportableContentFailures();
     // Bridge writes Rust refused as symbolic links (#216), beside the registry's
     // own materialize refusals — one row per path.
     const registry = [...this.registry.failures()];
@@ -6731,7 +6781,7 @@ export class SyncManager implements InboundHost {
         const relPath = this.registry.pathForDocId(docId);
         if (relPath) {
           this.localChanges.set(docId, relPath);
-          this.note("info", "push-queued", "Merged an edit made outside Baalda — sending the result", {
+          this.note("info", "push-queued", "Merged an edit made outside Baalda. Sending the result", {
             docId,
             path: relPath,
           });

@@ -690,11 +690,22 @@ export function createShareRoutes(deps: ShareDeps): Hono {
     const role = await orgRole(org, session.userId);
     if (!role) return c.json({ error: "Not a member of this vault" }, 403);
 
+    // Per-user rows are reported only to the person they name: another
+    // member's Can view / No access is nobody else's business, and a client
+    // that saw it would padlock its own editor with it. The one exception is a
+    // legacy per-user `locked` row, which owners/admins still see so the row
+    // menu's Unlock can clear it (the desktop badges it, never blocks on it).
+    const manager = role === "owner" || role === "admin";
     const { rows } = await pool.query(
       `SELECT s.id, s.resource_type, s.resource_id, s.principal_type, s.principal_id,
               s.permission, s.created_by, s.created_at
          FROM shares s
         WHERE s.permission IN ('locked', 'denied', 'readonly')
+          AND (
+            s.principal_type = 'org'
+            OR (s.principal_type = 'user' AND s.principal_id = $2)
+            OR ($3::boolean AND s.principal_type = 'user' AND s.permission = 'locked')
+          )
           AND (
             (s.resource_type = 'folder' AND s.resource_id IN
                (SELECT id FROM folders WHERE vault_id = $1))
@@ -702,7 +713,7 @@ export function createShareRoutes(deps: ShareDeps): Hono {
                (SELECT id FROM notes WHERE vault_id = $1 AND deleted_at IS NULL
                 UNION SELECT id FROM files WHERE vault_id = $1))
           )`,
-      [vaultId],
+      [vaultId, session.userId, manager],
     );
 
     // Billing lapse (account read-only): padlock the whole vault for everyone
@@ -729,7 +740,8 @@ export function createShareRoutes(deps: ShareDeps): Hono {
     // Read-only one (reported as a lift below), and a personal `denied` needs
     // nothing here — their readable set is already empty.
     const personal = await personalVaultLevel(pool, org, session.userId);
-    if (posture?.permission === "view" || personal === "view") {
+    const postureLocked = posture?.permission === "view" || personal === "view";
+    if (postureLocked) {
       rows.push({
         // NOT `posture.id` (nor the caller's personal row id). That is the live vault GRANT row, and
         // `DELETE /shares/:id` would happily accept it from an owner — which is
@@ -746,31 +758,37 @@ export function createShareRoutes(deps: ShareDeps): Hono {
         created_by: posture?.createdBy ?? null,
         created_at: posture?.createdAt ?? null,
       });
-
-      const { rows: lifts } = await pool.query(
-        `SELECT s.id, s.resource_type, s.resource_id, s.principal_type, s.principal_id,
-                s.permission, s.created_by, s.created_at
-           FROM shares s
-          WHERE s.permission = 'edit'
-            AND (
-              (s.principal_type = 'org' AND s.principal_id = $2)
-              OR (s.principal_type = 'user' AND s.principal_id = $3)
-            )
-            AND (
-              (s.resource_type = 'folder' AND s.resource_id IN
-                 (SELECT id FROM folders WHERE vault_id = $1))
-              OR (s.resource_type = 'file' AND s.resource_id IN
-                 (SELECT id FROM notes WHERE vault_id = $1 AND deleted_at IS NULL
-                  UNION SELECT id FROM files WHERE vault_id = $1))
-              -- The caller's own vault-level edit lifts the WHOLE vault out of
-              -- a Read-only posture (never another member's row).
-              OR (s.resource_type = 'vault' AND s.resource_id = $2
-                  AND s.principal_type = 'user' AND s.principal_id = $3)
-            )`,
-        [vaultId, org, session.userId],
-      );
-      rows.push(...lifts);
     }
+    // The caller's own per-user `edit` rows ride along in EVERY posture, not
+    // just Read-only: among one person's rows the deepest wins (resolver
+    // `userItemVerdict`), so a personal `edit` on a subfolder lifts that
+    // person's own `readonly`/`locked` row on an ancestor folder. Without the
+    // lift the client inherits the ancestor padlock and opens every note in the
+    // subfolder read-only. Org `edit` rows only lift the vault posture seed, so
+    // they are reported only when there is one.
+    const { rows: lifts } = await pool.query(
+      `SELECT s.id, s.resource_type, s.resource_id, s.principal_type, s.principal_id,
+              s.permission, s.created_by, s.created_at
+         FROM shares s
+        WHERE s.permission = 'edit'
+          AND (
+            ($4::boolean AND s.principal_type = 'org' AND s.principal_id = $2)
+            OR (s.principal_type = 'user' AND s.principal_id = $3)
+          )
+          AND (
+            (s.resource_type = 'folder' AND s.resource_id IN
+               (SELECT id FROM folders WHERE vault_id = $1))
+            OR (s.resource_type = 'file' AND s.resource_id IN
+               (SELECT id FROM notes WHERE vault_id = $1 AND deleted_at IS NULL
+                UNION SELECT id FROM files WHERE vault_id = $1))
+            -- The caller's own vault-level edit lifts the WHOLE vault out of
+            -- a Read-only posture (never another member's row).
+            OR ($4::boolean AND s.resource_type = 'vault' AND s.resource_id = $2
+                AND s.principal_type = 'user' AND s.principal_id = $3)
+          )`,
+      [vaultId, org, session.userId, postureLocked],
+    );
+    rows.push(...lifts);
     return c.json({ locks: rows });
   });
 

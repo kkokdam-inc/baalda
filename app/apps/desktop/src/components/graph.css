@@ -61,46 +61,49 @@
   cursor: pointer;
 }
 
-/* ---- Header bar overlay ---- */
-/* `.graph-view` is a full-window overlay, so this floating bar would sit under
-   the macOS traffic lights without the title-bar inset. */
-.graph-header {
+/* ---- Floating controls (no title bar) ---- */
+/* `.graph-view` is a full-window overlay, so the top edge has no OS title bar
+   to grab. This invisible strip restores it: the traffic-light row on macOS,
+   the caption row on Windows (minus the caption buttons, which sit above the
+   overlay), and nothing on Linux, whose native title bar is outside the
+   webview. */
+.graph-drag-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--titlebar-inset);
+  z-index: 2;
+}
+
+html[data-platform="windows"] .graph-drag-strip {
+  right: 138px;
+  height: var(--chrome-row-h);
+}
+
+/* Top-right, clear of the macOS traffic lights (top-left, inside the
+   title-bar inset) and below the Windows caption buttons (top-right, in the
+   chrome row). The canvas is dark in every app theme, so the pill is a
+   translucent light grey over it in both. */
+.graph-floating-controls {
   position: absolute;
   top: calc(var(--sp-4) + var(--titlebar-inset));
-  left: var(--sp-4);
   right: var(--sp-4);
-  z-index: 1;
+  z-index: 3;
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  pointer-events: auto;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
-html[data-platform="windows"] .graph-header {
+html[data-platform="windows"] .graph-floating-controls {
   top: calc(var(--chrome-row-h) + var(--sp-2));
-}
-
-.graph-title {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: var(--fs-lg);
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.graph-counts {
-  font-size: var(--fs-sm);
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.graph-header-spacer {
-  flex: 1;
 }
 
 .graph-icon-btn {
@@ -112,25 +115,34 @@ html[data-platform="windows"] .graph-header {
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.78);
   font-size: var(--fs-lg);
   line-height: 1;
   cursor: pointer;
   transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
 
+/* The app-wide hover tint, lifted so it still shows on the dark canvas in the
+   light theme (whose --bg-hover is a near-white wash) and the dark one (whose
+   --bg-hover is close to the canvas itself). */
 .graph-icon-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-hover) 45%, rgba(255, 255, 255, 0.16));
+  color: #fff;
 }
 
 .graph-icon-btn:active {
-  background: var(--bg-active);
+  background: color-mix(in srgb, var(--bg-active) 45%, rgba(255, 255, 255, 0.24));
+}
+
+.graph-icon-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  color: #fff;
 }
 
 .graph-icon-btn.is-active {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 38%, transparent);
+  color: #fff;
 }
 
 .graph-icon-btn.is-spinning {

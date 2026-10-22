@@ -289,8 +289,8 @@ export function AccountVaultsTab() {
         const ends = result.subscription.currentPeriodEnd;
         toast(
           ends
-            ? `Vault deleted. Pro ends on ${formatDate(ends)} — move it from Billing if you want to keep it.`
-            : "Vault deleted. Pro ends when the current period does — move it from Billing if you want to keep it.",
+            ? `Vault deleted. Pro ends on ${formatDate(ends)}. Move it from Billing if you want to keep it.`
+            : "Vault deleted. Pro ends when the current period does. Move it from Billing if you want to keep it.",
           "neutral",
         );
       }
@@ -304,7 +304,7 @@ export function AccountVaultsTab() {
       // The cancel-failed message is already a full sentence (#300).
       const cancelFailed =
         e instanceof ApiError && (e.body as { error?: unknown } | undefined)?.error === "subscription_cancel_failed";
-      toast(cancelFailed ? message : `Couldn't delete the vault — ${message}`, "error");
+      toast(cancelFailed ? message : `Couldn't delete the vault: ${message}`, "error");
     } finally {
       setBusy(false);
     }
@@ -325,7 +325,7 @@ export function AccountVaultsTab() {
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setActionError(message);
-      toast(`Couldn't leave the vault — ${message}`, "error");
+      toast(`Couldn't leave the vault: ${message}`, "error");
     } finally {
       setBusy(false);
     }
@@ -359,7 +359,7 @@ export function AccountVaultsTab() {
       label: "Delete vault",
       danger: true,
       separated: true,
-      title: "Delete this vault — moves its folder and all its notes to the Trash",
+      title: "Delete this vault: moves its folder and all its notes to the Trash",
       onSelect: () => {
         setActionError(null);
         setConfirmDeleteLocal({ path, name });
@@ -504,7 +504,7 @@ export function AccountVaultsTab() {
           label: "Leave vault",
           danger: true,
           separated: true,
-          title: "Leave this vault — you lose access and it is removed from this device",
+          title: "Leave this vault. You lose access and it is removed from this device",
           onSelect: () => {
             setActionError(null);
             setConfirmLeave({ orgId: o.id, name: o.name });
