@@ -176,9 +176,8 @@ describe("editor theme tiers", () => {
         "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground"
       ].backgroundColor,
     ).toBe("var(--editor-selection-bg)");
-    expect(editorThemeSpec[".cm-note-title.is-selected"].backgroundColor).toBe(
-      "var(--editor-selection-bg)",
-    );
+    // The title is the file name, never part of a text selection: no wash.
+    expect(editorThemeSpec[".cm-note-title.is-selected"]).toBeUndefined();
   });
 
   it("puts the bullet and the gutter on the faint tier", () => {
