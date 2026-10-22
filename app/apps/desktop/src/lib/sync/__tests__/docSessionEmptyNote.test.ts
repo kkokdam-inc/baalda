@@ -448,6 +448,8 @@ describe("ready.empty for a note that is not on disk yet", () => {
   it("does not probe a doc whose placeholder is still deferred, and does not queue it", async () => {
     fakeRegistry.deferredPathFor.mockImplementation((docId: string) => (docId === DOC ? REL : null));
     fakeDisk.files.delete(REL);
+    // A server-listed note: only `ready.empty` could queue it, not "never pushed".
+    fakeRegistry.pushed.add(DOC);
     try {
       const sm = manager();
       await enable(sm);
@@ -470,7 +472,7 @@ describe("ready.empty for a note that is not on disk yet", () => {
     await ready(sm, [DOC]);
     expect(ipc.noteExists).toHaveBeenCalledWith(REL, 1);
     expect(fakeRegistry.isNoteEmptyOnDisk).not.toHaveBeenCalled();
-    // Same verdict a failed read gave: not settled as empty everywhere.
-    expect(fakeRegistry.markPushed).not.toHaveBeenCalledWith(DOC);
+    // Same verdict a failed read gave: not settled as empty, kept in the push queue.
+    expect(connects.order).toEqual([DOC]);
   });
 });

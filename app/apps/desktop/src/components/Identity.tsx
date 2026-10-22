@@ -28,7 +28,8 @@ export function isSyncRunActive(progress: SyncProgress | null | undefined): bool
   if (!progress || !isBulkPhase(progress.phase)) return false;
   if (progress.phase === "removing") return true;
   if (progress.phase === "uploading" && (progress.notUploaded ?? 0) > 0) return true;
-  return progress.total > progress.done;
+  // A counter that raced past its denominator is a run still in flight.
+  return progress.total > progress.done || (progress.total > 0 && progress.done > progress.total);
 }
 
 /** How long a run that just appeared must last before the pill leaves green. */

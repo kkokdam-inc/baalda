@@ -154,8 +154,8 @@ describe("syncBadgeLabel with a bulk sync run", () => {
       expect(isSyncRunActive(progress)).toBe(false);
       expect(syncBadgeLabel({ status: "synced", now, progress })).not.toMatch(/^Syncing/);
       expect(syncBadgeTone({ status: "synced", progress })).toBe("synced");
-      expect(syncBadgeLabel({ status: "synced", now, progress, noteOpen: false })).toBe("Synced");
-      expect(syncBadgeTone({ status: "synced", progress, noteOpen: false })).toBe("synced");
+      expect(syncBadgeLabel({ status: "synced", now, progress, noteOpen: false, vaultStatus: "synced" })).toBe("Synced");
+      expect(syncBadgeTone({ status: "synced", progress, noteOpen: false, vaultStatus: "synced" })).toBe("synced");
     }
   });
 
