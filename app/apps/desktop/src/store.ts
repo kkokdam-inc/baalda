@@ -4852,7 +4852,12 @@ export const useStore = create<AppStore>((set, get) => ({
         .catch((e) => console.warn("[sync] enable failed", e));
     }
     await get().refreshTree();
-    await get().refreshTitles();
+    // Titles wait on the index lock, which the background rebuild holds; the
+    // `index-ready` event refreshes them again once it commits, so the switch
+    // must not sit behind the rebuild (launch already voids this the same way).
+    void get()
+      .refreshTitles()
+      .catch((e) => console.warn("[vault] title refresh failed", e));
     // A shared link parked on the choose-a-folder prompt resumes here, now
     // that the vault has a folder and its pull has started. Guarded by orgId
     // so a link queued for some OTHER flow isn't eaten by an unrelated bind.
