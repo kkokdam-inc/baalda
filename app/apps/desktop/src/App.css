@@ -7886,7 +7886,8 @@ button.secondary:active:not(:disabled),
   pointer-events: none;
 }
 .right-panel-tab.active,
-.panel-btn.active {
+.panel-btn.active,
+.history-btn.active {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }

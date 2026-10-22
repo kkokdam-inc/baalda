@@ -1715,6 +1715,31 @@ export default function App() {
               <TalkButton />
               {/* Same gate as history: a link is a doc_id, so it only exists for a
                   note the server knows about. */}
+              {/* Version history straight from the header: the panel's Versions
+                  tab for the open note. Same gate as the Versions content. */}
+              {versionDocId && !isPreview && (
+                <button
+                  className={`icon-btn history-btn${versionsTabOpen ? " active" : ""}`}
+                  title="Version history"
+                  aria-label="Version history"
+                  aria-pressed={versionsTabOpen}
+                  onClick={() => useStore.getState().toggleVersionsPanel()}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 12a9 9 0 1 0 2.6-6.4" />
+                    <path d="M3 4v4h4" />
+                    <path d="M12 8v4l3 2" />
+                  </svg>
+                </button>
+              )}
               {versionDocId && !isPreview && <ShareNoteButton docId={versionDocId} />}
               {document.documentElement.dataset.platform !== "windows" && (
                 <GraphButton onClick={() => setGraphOpen(true)} />

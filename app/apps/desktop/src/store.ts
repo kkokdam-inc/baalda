@@ -1019,6 +1019,9 @@ interface AppStore {
   openRightPanel: (tab?: RightPanelTab) => void;
   closeRightPanel: () => void;
   setRightPanelTab: (tab: RightPanelTab) => void;
+  /** The header's Version history button: open the panel on Versions, switch
+   *  to it from Activity, or close the panel when Versions is already showing. */
+  toggleVersionsPanel: () => void;
   /** Load one version's markdown for the read-only editor overlay. */
   previewVersion: (versionId: number) => Promise<void>;
   clearVersionPreview: () => void;
@@ -2088,6 +2091,10 @@ export const useStore = create<AppStore>((set, get) => ({
   closeRightPanel: () =>
     set({ rightPanel: null, versionPanelDocId: null, noteVersions: null, versionPreview: null }),
   setRightPanelTab: (tab) => get().openRightPanel(tab),
+  toggleVersionsPanel: () => {
+    if (get().rightPanel?.tab === "versions") get().closeRightPanel();
+    else get().openRightPanel("versions");
+  },
   settingsDismissToken: 0,
   dismissSettings: () =>
     set((s) => ({

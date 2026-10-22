@@ -355,6 +355,16 @@ describe("right panel", () => {
     expect(useStore.getState().versionPanelDocId).toBeNull();
   });
 
+  it("the header's Version history button opens Versions, switches from Activity, and closes on Versions", () => {
+    useStore.getState().toggleVersionsPanel();
+    expect(useStore.getState().rightPanel).toEqual({ tab: "versions" });
+    useStore.getState().toggleVersionsPanel();
+    expect(useStore.getState().rightPanel).toBeNull();
+    useStore.getState().openRightPanel("activity");
+    useStore.getState().toggleVersionsPanel();
+    expect(useStore.getState().rightPanel).toEqual({ tab: "versions" });
+  });
+
   it("remembers the last tab when storage is available", () => {
     const store = new Map<string, string>();
     const prev = (globalThis as { localStorage?: unknown }).localStorage;
