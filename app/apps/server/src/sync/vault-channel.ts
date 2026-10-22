@@ -5,7 +5,7 @@ import { config } from "../config.js";
 import { type PubSub, vaultTopic } from "./pubsub.js";
 import { decodeUserEvent, USER_EVENTS_CAP, userTopic } from "./user-events.js";
 import { verifyVaultToken } from "../tokens/vault-token.js";
-import { listReadableDocsInVault } from "../permissions/vault-docs.js";
+import { listReadableDocsInVault, type SharedVaultReads } from "../permissions/vault-docs.js";
 import { listEmptyDocs, loadDocDiff } from "../yjs/persistence.js";
 import { deletedNotesAmong } from "../trash/access.js";
 import { observeCount } from "../metrics/sync-metrics.js";
@@ -174,6 +174,16 @@ export class VaultChannel {
    *  stamps 40 rows inside a second, and that is one announcement. */
   private readonly pendingMeta = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly pendingActivity = new Map<string, ReturnType<typeof setTimeout>>();
+  /**
+   * One memo per delivered pubsub message. Both pubsub implementations hand the
+   * SAME payload object to every local handler of a topic, synchronously, so
+   * every socket refreshing its readable set for one `acl-changed` /
+   * `registry-changed` finds the memo the first one made. Every read in it
+   * started after that message arrived, i.e. after the change it announces was
+   * committed, so no socket can be served a set older than its own trigger. A
+   * new message is a new object and a new memo: nothing outlives the event.
+   */
+  private readonly readsByMessage = new WeakMap<object, SharedVaultReads>();
 
   constructor(deps: VaultChannelDeps) {
     this.pubsub = deps.pubsub;
@@ -459,6 +469,14 @@ export class VaultChannel {
       brakeState: this.brakeState,
       noteLastSeen: this.noteLastSeen,
       onGone: (c) => this.connections.delete(c),
+      sharedReadsFor: (trigger) => {
+        let reads = this.readsByMessage.get(trigger);
+        if (!reads) {
+          reads = new Map();
+          this.readsByMessage.set(trigger, reads);
+        }
+        return reads;
+      },
     });
     this.connections.add(conn);
   }
@@ -477,6 +495,8 @@ interface ConnDeps {
   brakeState?: VaultChannelDeps["brakeState"];
   noteLastSeen?: VaultChannelDeps["noteLastSeen"];
   onGone: (conn: VaultConnection) => void;
+  /** The per-message memo ({@link VaultChannel} `readsByMessage`). */
+  sharedReadsFor?: (trigger: object) => SharedVaultReads;
 }
 
 /**
@@ -1027,6 +1047,31 @@ class VaultConnection {
     this.sendBinary(encodeWsUpdate(docId, diff.update));
   }
 
+  /**
+   * This user's readable set, shared with their other sockets on this instance
+   * that answer the SAME message (and the user-independent reads shared with
+   * everyone else's). Without a trigger it is computed alone, as before.
+   * `this.readable` is only ever replaced, never edited, so one Set instance
+   * may back several connections.
+   */
+  private readableFor(trigger: object | undefined): Promise<Set<string>> {
+    const userId = this.userId!;
+    const vaultId = this.vaultId!;
+    const reads = trigger && this.deps.sharedReadsFor ? this.deps.sharedReadsFor(trigger) : undefined;
+    if (!reads) return this.deps.listReadableDocs(userId, vaultId);
+    const key = `readable\u0000${vaultId}\u0000${userId}`;
+    let p = reads.get(key) as Promise<Set<string>> | undefined;
+    if (!p) {
+      const fresh = this.deps.listReadableDocs(userId, vaultId, undefined, reads);
+      p = fresh;
+      reads.set(key, fresh);
+      fresh.catch(() => {
+        if (reads.get(key) === fresh) reads.delete(key);
+      });
+    }
+    return p;
+  }
+
   private onPubsub(payload: Uint8Array): void {
     const msg = decodePubsub(payload);
     if (!msg) return;
@@ -1068,7 +1113,7 @@ class VaultConnection {
       // was torn down and rebuilt (badge: synced→offline→connecting→synced), and
       // the registry pull that followed published the next `registry-changed`. An
       // idle client reauthed itself nine times in half an hour that way.
-      void this.refreshAcl({ reauth: selfOnly ? "never" : "if-changed" });
+      void this.refreshAcl({ reauth: selfOnly ? "never" : "if-changed", trigger: payload });
       // Self-exclusion applies to the re-pull too. This client already holds the
       // ids the API returned it, so asking it to re-pull its own writes is a
       // wasted round trip (listFolders + listNotes + a full client syncStructure).
@@ -1189,16 +1234,16 @@ class VaultConnection {
       return;
     }
     // acl-changed: re-evaluate; drop revoked docs, backfill newly-granted ones.
-    void this.refreshAcl();
+    void this.refreshAcl({ trigger: payload });
   }
 
   private async refreshAcl(
-    opts: { reauth?: "always" | "if-changed" | "never" } = {},
+    opts: { reauth?: "always" | "if-changed" | "never"; trigger?: object } = {},
   ): Promise<void> {
     if (!this.userId || !this.vaultId) return;
     let next: Set<string>;
     try {
-      next = await this.deps.listReadableDocs(this.userId, this.vaultId);
+      next = await this.readableFor(opts.trigger);
     } catch (err) {
       console.error("Vault channel ACL refresh failed:", err);
       return;
