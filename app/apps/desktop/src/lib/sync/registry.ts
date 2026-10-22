@@ -3655,6 +3655,17 @@ export class VaultRegistry {
     // the window — dropping it loses a real fact about the server.
     this.checkpoint ?? this.newCheckpointer();
     this.sink.phase("registering", 0);
+    // When the prime already parsed the config, its collection id is known
+    // before the disk walk: start the listings and the collection list now so
+    // they fly alongside `readFullTree` instead of behind it. Consumed below only
+    // for that SAME id (`takeListings` checks it); a failure falls back to the
+    // ordinary request.
+    const earlyVaultId = this.primedConfig?.serverVaultId ?? null;
+    if (earlyVaultId) this.prefetchListings(earlyVaultId);
+    const earlyVaults = earlyVaultId ? this.api.listVaults() : null;
+    earlyVaults?.catch(() => {
+      /* re-requested at the await below */
+    });
     // Epoch-pinned like every other read here: a vault switch mid-walk makes Rust
     // reject it, which `stale()` then turns into a clean drop.
     const tree = await this.readFullTree();
@@ -3681,7 +3692,9 @@ export class VaultRegistry {
     // Start the listings for the id we already believe in, so they fly alongside
     // the validation rather than behind it. See `prefetchedListings`.
     if (cfg.serverVaultId) this.prefetchListings(cfg.serverVaultId);
-    const vaults = await this.api.listVaults();
+    const vaults = await (earlyVaults && cfg.serverVaultId === earlyVaultId
+      ? earlyVaults.catch(() => this.api.listVaults())
+      : this.api.listVaults());
     if (this.stale()) return { seeded: false };
     const inOrg = vaults.filter((v) => vaultOrgId(v) === input.organizationId);
     let vaultId = cfg.serverVaultId ?? null;
