@@ -70,6 +70,37 @@ describe("note index: graph + search endpoints", () => {
     expect(byTitle["Ghost"].toDocId).toBeNull(); // dangling link
   });
 
+  it("graph resolves wikilinks across NFC/NFD normalization (#332)", async () => {
+    const owner = await signUp("owner@graph-nfc.com");
+    const org = await createOrg(owner, "Acme", "acme-graph-nfc");
+    const vault = await seedVault(org.id);
+    await seedVaultGrant(org.id, "edit");
+    const nfc = (s: string) => s.normalize("NFC");
+    const nfd = (s: string) => s.normalize("NFD");
+    // macOS-style decomposed file name, linked with composed (typed) text.
+    const cafe = await seedNote(vault, null, nfd("Café.md"));
+    // Composed file name, linked with decomposed text (and different case).
+    const resume = await seedNote(vault, null, nfc("Résumé.md"));
+    const source = await seedNote(vault, null, "Source.md");
+
+    await writeNoteBody(source, `See [[${nfc("Café")}]] and [[${nfd("RÉSUMÉ")}]].`);
+    await indexDoc(source);
+    await indexDoc(cafe);
+    await indexDoc(resume);
+
+    const res = await graph(owner.token, vault);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      links: Array<{ fromDoc: string; toTitle: string; toDocId: string | null }>;
+    };
+    const fromSource = body.links.filter((l) => l.fromDoc === source);
+    expect(fromSource).toHaveLength(2);
+    const byTarget = Object.fromEntries(fromSource.map((l) => [l.toTitle, l.toDocId]));
+    // Stored link text keeps its original bytes; only matching normalizes.
+    expect(byTarget[nfc("Café")]).toBe(cafe);
+    expect(byTarget[nfd("RÉSUMÉ")]).toBe(resume);
+  });
+
   it("search ranks the semantically-matching note first", async () => {
     const owner = await signUp("owner@search.com");
     const org = await createOrg(owner, "Acme", "acme-search1");

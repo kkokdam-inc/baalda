@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-const normalize = (s) => s.trim().replace(/\.md$/, "").toLowerCase();
+// NFC + lower-case: macOS file names are often NFD, typed link text NFC (#332).
+const normalize = (s) => s.normalize("NFC").trim().replace(/\.md$/, "").toLowerCase();
 const basename = (s) => s.split("/").pop();
 
 /** Conservative MVP: plain wikilinks only; skip embeds, code, comments and frontmatter. */

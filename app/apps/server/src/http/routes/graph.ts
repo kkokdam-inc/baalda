@@ -24,6 +24,16 @@ function relPathStem(relPath: string): string {
   return base.replace(/\.[^.]+$/, "");
 }
 
+/**
+ * Comparison key for wikilink resolution: NFC + lower-case. macOS file names
+ * are often NFD while typed link text is NFC, so `[[Café]]` must still find
+ * `Café.md` (#332). Used at comparison time only; stored paths, titles and
+ * `note_links.to_title` keep their original bytes.
+ */
+function linkMatchKey(s: string): string {
+  return s.normalize("NFC").toLowerCase();
+}
+
 /** Gate: caller must be a member of the vault. 404/403 otherwise. */
 async function gateVaultMember(
   vaultId: string,
@@ -39,7 +49,8 @@ async function gateVaultMember(
 
 // Graph: every note in the vault plus its outgoing wikilink edges. `toDocId` is
 // resolved by matching a link's raw title against note titles / rel_path stems
-// (case-insensitive) in the same vault; unresolved links keep toDocId = null.
+// (case- and Unicode-normalization-insensitive, `linkMatchKey`) in the same
+// vault; unresolved links keep toDocId = null.
 graphRoutes.get("/vaults/:vaultId/graph", async (c) => {
   const session = await getSession(c);
   if (!session) return c.json({ error: "Authentication required" }, 401);
@@ -70,12 +81,12 @@ graphRoutes.get("/vaults/:vaultId/graph", async (c) => {
     relPath: n.rel_path,
   }));
 
-  // Resolve targets by lowercased title AND rel_path stem.
+  // Resolve targets by title AND rel_path stem, both through linkMatchKey.
   const byTitle = new Map<string, string>();
   for (const n of noteRows) {
-    const title = (n.title ?? relPathStem(n.rel_path)).toLowerCase();
+    const title = linkMatchKey(n.title ?? relPathStem(n.rel_path));
     if (!byTitle.has(title)) byTitle.set(title, n.id);
-    const stem = relPathStem(n.rel_path).toLowerCase();
+    const stem = linkMatchKey(relPathStem(n.rel_path));
     if (!byTitle.has(stem)) byTitle.set(stem, n.id);
   }
 
@@ -97,7 +108,7 @@ graphRoutes.get("/vaults/:vaultId/graph", async (c) => {
     .map((l) => ({
       fromDoc: l.from_doc,
       toTitle: l.to_title,
-      toDocId: byTitle.get(l.to_title.toLowerCase()) ?? null,
+      toDocId: byTitle.get(linkMatchKey(l.to_title)) ?? null,
     }));
 
   return c.json({ nodes, links });
