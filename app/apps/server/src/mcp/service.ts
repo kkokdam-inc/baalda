@@ -219,11 +219,34 @@ async function requireVaultInScope(auth: McpAuth, vaultId: string): Promise<void
     "SELECT organization_id FROM vaults WHERE id = $1",
     [vaultId],
   );
-  const org = rows[0]?.organization_id;
-  if (!org) throw new McpToolError(`Unknown vault: ${vaultId}`);
-  if (org !== auth.organizationId) {
-    throw new McpToolError("This vault is outside the scope of this token");
+  // One answer for "no such id" and "another team's id": a differing message
+  // would let a token probe which ids exist outside its vault.
+  if (rows[0]?.organization_id !== auth.organizationId) {
+    throw new McpToolError(outOfScope("vault", vaultId));
   }
+}
+
+/** The refusal for an id that does not exist OR lives outside the token's vault. */
+function outOfScope(kind: "vault" | "folder" | "note" | "file", id: string): string {
+  return `Unknown ${kind}, or it is outside the scope of this token: ${id}`;
+}
+
+/** {@link requireVaultInScope} for an item lookup: refuse with the ITEM's
+ *  not-found answer, so a foreign item reads exactly like a missing one. */
+async function requireItemVaultInScope(
+  auth: McpAuth,
+  kind: "folder" | "file",
+  id: string,
+  vaultId: string | undefined,
+): Promise<string> {
+  if (vaultId) {
+    const { rows } = await pool.query<{ organization_id: string }>(
+      "SELECT organization_id FROM vaults WHERE id = $1",
+      [vaultId],
+    );
+    if (rows[0]?.organization_id === auth.organizationId) return vaultId;
+  }
+  throw new McpToolError(outOfScope(kind, id));
 }
 
 async function isAdmin(auth: McpAuth): Promise<boolean> {
@@ -404,9 +427,7 @@ export async function deleteFolder(
     "SELECT vault_id FROM folders WHERE id = $1",
     [folderId],
   );
-  const vaultId = rows[0]?.vault_id;
-  if (!vaultId) throw new McpToolError(`Unknown folder: ${folderId}`);
-  await requireVaultInScope(ctx.auth, vaultId);
+  const vaultId = await requireItemVaultInScope(ctx.auth, "folder", folderId, rows[0]?.vault_id);
   if ((await folderWritePermission(ctx.auth, folderId)) !== "edit") {
     throw await writeRefusal(ctx.auth.organizationId, "You do not have edit access to delete this folder");
   }
@@ -440,8 +461,8 @@ export async function moveFolderTool(
   input: { folderId: string; path?: string; name?: string; parentId?: string | null },
 ) {
   const folder = await findFolder(pool, input.folderId);
-  if (!folder) throw new McpToolError(`Unknown folder: ${input.folderId}`);
-  await requireVaultInScope(ctx.auth, folder.vault_id);
+  await requireItemVaultInScope(ctx.auth, "folder", input.folderId, folder?.vault_id);
+  if (!folder) throw new McpToolError(outOfScope("folder", input.folderId));
   if ((await folderWritePermission(ctx.auth, input.folderId)) !== "edit") {
     throw await writeRefusal(ctx.auth.organizationId, "You do not have edit access to move this folder");
   }
@@ -670,9 +691,9 @@ async function locateNote(auth: McpAuth, docId: string) {
     [docId],
   );
   const note = rows[0];
-  if (!note) throw new McpToolError(`Unknown note: ${docId}`);
-  if (note.organization_id !== auth.organizationId) {
-    throw new McpToolError("This note is outside the scope of this token");
+  // Same answer for missing and foreign, so a token cannot probe other vaults.
+  if (!note || note.organization_id !== auth.organizationId) {
+    throw new McpToolError(outOfScope("note", docId));
   }
   return note;
 }
@@ -1225,8 +1246,9 @@ export async function deleteNote(ctx: McpContext, docId: string) {
 /** Delete a tree file through the SAME gate as `DELETE /api/files/:id`. */
 export async function deleteFileTool(ctx: McpContext, fileId: string) {
   const out = await deleteRegisteredFile(ctx.auth.userId, fileId, ctx.auth.organizationId);
-  if (out.status === "gone") throw new McpToolError(`Unknown file: ${fileId}`);
-  if (out.status === "not_member") throw new McpToolError("This file is outside the scope of this token");
+  if (out.status === "gone" || out.status === "not_member") {
+    throw new McpToolError(outOfScope("file", fileId));
+  }
   if (out.status === "account_read_only") throw new McpToolError(ACCOUNT_READ_ONLY_MESSAGE, ACCOUNT_READ_ONLY.code);
   if (out.status === "forbidden") throw await writeRefusal(ctx.auth.organizationId, "You do not have edit access to this file");
   if (out.status === "not_creator") {
@@ -1250,8 +1272,8 @@ export async function moveFileTool(ctx: McpContext, fileId: string, path: string
     [fileId],
   );
   const row = rows[0];
-  if (!row) throw new McpToolError(`Unknown file: ${fileId}`);
-  await requireVaultInScope(ctx.auth, row.vault_id);
+  await requireItemVaultInScope(ctx.auth, "file", fileId, row?.vault_id);
+  if (!row) throw new McpToolError(outOfScope("file", fileId));
   const out = await registerFile(registerCtx(row.vault_id, ctx.auth.userId), {
     path,
     docId: fileId,

@@ -69,6 +69,9 @@ const WWW_AUTHENTICATE = `Bearer resource_metadata="${config.betterAuthUrl}/.wel
  * connector traffic arrives from shared egress addresses, and an OAuth client's
  * first discovery request carries NO token and is never limited.
  */
+/** Most JSON-RPC messages one POST /api/mcp may carry. */
+export const MCP_MAX_BATCH = 50;
+
 const BAD_TOKEN_LIMIT = 20;
 const BAD_TOKEN_WINDOW_MS = 10 * 60_000;
 const BAD_TOKEN_MAX_KEYS = 10_000;
@@ -211,6 +214,20 @@ export function createMcpRoutes(deps: McpDeps): Hono {
 
     // A batch (array) or a single message. Notifications yield no response.
     const messages = Array.isArray(body) ? body : [body];
+    // Bound the work one request can ask for: every message is a tool call run
+    // in sequence, and an unbounded batch is unbounded cost per request. The
+    // current MCP revision dropped JSON-RPC batching altogether, so no client
+    // that follows it comes near this.
+    if (messages.length > MCP_MAX_BATCH) {
+      return c.json(
+        {
+          jsonrpc: "2.0",
+          id: null,
+          error: { code: -32600, message: `Batch too large: at most ${MCP_MAX_BATCH} messages per request` },
+        },
+        400,
+      );
+    }
     const responses = [];
     let toolCalls = 0;
     for (const m of messages) {
