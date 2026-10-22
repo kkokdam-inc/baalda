@@ -62,6 +62,7 @@ function setup(readable: Map<string, Set<string>>) {
       clientAhead: false,
     }),
     listEmpty: async () => ({ empty: [] as string[], truncated: false }),
+    listDeletedAmong: async () => new Set<string>(),
     backfillConcurrency: 4,
     registryCoalesceMs: 0,
   });
