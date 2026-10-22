@@ -6126,16 +6126,15 @@ export class SyncManager implements InboundHost {
     this.downloadPhase = false;
     this.channelStalled = false;
     this.clearChannelWatchdog();
-    const uploadFailures = this.uploader?.failedDocs().length ?? 0;
     const clean =
-      uploadFailures === 0 &&
-      // The bulk engine's own refusals count exactly as much as the per-doc
-      // ones: a bootstrap page that could not be applied, or a doc the batch
-      // push was denied, leaves the vault partly unsynced either way.
-      this.bulkFailures.size === 0 &&
+      // Per-doc, bulk and permanent failures, judged exactly as Activity lists
+      // them (see `reportableContentFailures`): a failure a later push
+      // confirmed, a superseded attempt or a transient error still retrying
+      // does not make the vault unsynced. A bulk refusal or a permanent one
+      // (too large) still does.
+      this.reportableContentFailures().length === 0 &&
       !this.serverTooOld &&
       this.pullFailure() == null &&
-      this.permanentFailures.size === 0 &&
       !this.registry.hasFailures() &&
       this.registry.limitCode() == null;
     progress.phase(clean ? "done" : "error");
@@ -6219,20 +6218,17 @@ export class SyncManager implements InboundHost {
     return notUploaded > 0 ? { ...p, notUploaded } : p;
   }
 
-  /** Everything the current run could not sync — registry rows and note content. */
-  syncFailures(): {
-    registry: ReturnType<VaultRegistry["failures"]>;
-    // `permanent` controls retry scheduling; `kind` carries the diagnosis. The
-    // Health page must not infer "too large" from terminal scheduling metadata.
-    content: Array<{
-      docId: string;
-      relPath: string;
-      reason: string;
-      permanent?: boolean;
-      kind?: UploadFailure["kind"];
-    }>;
-    limitCode: string | null;
-  } {
+  /**
+   * The content failures that are still TRUE, as one list: what Activity shows
+   * AND what decides whether a run ended clean ({@link completeRun}). Raw
+   * `uploader.failedDocs()` / `bulkFailures` also hold failures a later push
+   * already confirmed (`failureGrace` settled), attempts superseded by a
+   * re-queue (`invalidatedFailures`, `localChanges`) and transient errors still
+   * inside their retry grace. Counting those made a run end in `error` (the
+   * old "Sync incomplete" pill) while Activity listed nothing and every note
+   * was synced.
+   */
+  private reportableContentFailures(): UploadFailure[] {
     // Permanent failures are remembered across runs (see the field), so they are
     // reported from there; the live uploader's list covers this run's transient
     // ones. A doc in both is listed once.
@@ -6263,6 +6259,24 @@ export class SyncManager implements InboundHost {
       if (this.localChanges.has(f.docId)) continue;
       content.push(f);
     }
+    return content;
+  }
+
+  /** Everything the current run could not sync — registry rows and note content. */
+  syncFailures(): {
+    registry: ReturnType<VaultRegistry["failures"]>;
+    // `permanent` controls retry scheduling; `kind` carries the diagnosis. The
+    // Health page must not infer "too large" from terminal scheduling metadata.
+    content: Array<{
+      docId: string;
+      relPath: string;
+      reason: string;
+      permanent?: boolean;
+      kind?: UploadFailure["kind"];
+    }>;
+    limitCode: string | null;
+  } {
+    const content = this.reportableContentFailures();
     // Bridge writes Rust refused as symbolic links (#216), beside the registry's
     // own materialize refusals — one row per path.
     const registry = [...this.registry.failures()];
