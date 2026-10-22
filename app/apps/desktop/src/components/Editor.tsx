@@ -11,6 +11,7 @@ import { foldEffectsFor, parseNoteUiState, persistFolds } from "../lib/editor/fo
 import { propertiesMode as propertiesModeFacet } from "../lib/editor/frontmatter";
 import { loadTypes } from "../lib/frontmatter/types";
 import { dispatchAfterCommit } from "../lib/editor/effectDispatch";
+import { openingCaret } from "../lib/editor/livePreview";
 import { wikilinkTitlesChanged } from "../lib/editor/wikilinks";
 import { wikilinkClickAction } from "../lib/editor/wikilinkResolve";
 import { setActiveNote } from "../lib/editor/activeView";
@@ -644,8 +645,24 @@ export function Editor() {
       });
       setMountedNotePath(notePath);
 
+      // Start the caret in the visible body, never on what the header hides
+      // (the duplicate first H1, a Properties panel's YAML): focus would
+      // otherwise reveal that line, and peers would see our caret off the page.
+      const caretView = view;
+      const parkCaret = () => {
+        if (cancelled || viewRef.current !== caretView) return;
+        const pos = openingCaret(caretView.state);
+        if (pos != null) caretView.dispatch({ selection: { anchor: pos } });
+      };
+      parkCaret();
+      let revealed = false;
       const reveal = () => {
-        if (!cancelled) setReadyNotePath(notePath);
+        if (cancelled) return;
+        // A cold note's text arrives after mount, mapped around the caret at 0.
+        // Once, and deferred: this can run from inside a Y.Text observer.
+        if (!readyAtMount && !revealed) queueMicrotask(parkCaret);
+        revealed = true;
+        setReadyNotePath(notePath);
       };
       const readyAtMount = noteContentReady({
         textLength: bridge.text.length,

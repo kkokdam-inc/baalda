@@ -10,6 +10,7 @@ import { Compartment, EditorSelection, EditorState, StateEffect } from "@codemir
 import { EditorView } from "@codemirror/view";
 import { describe, expect, it } from "vitest";
 import { createEditorState } from "./index";
+import { openingCaret, visibleBodyPos } from "./livePreview";
 import { clampSelectionToBody } from "./noteHeader";
 import type { NoteHeaderOptions } from "./noteHeader";
 import { setFocused } from "./reveal";
@@ -117,6 +118,49 @@ describe("the inline title widget", () => {
     expect(view.contentDOM.textContent).not.toContain("# My Note");
     expect(view.state.doc.toString()).toBe("# My Note\n\nBody text.");
     view.destroy();
+  });
+
+  it("opens with the caret below the duplicate, so focus does not reveal it", () => {
+    const doc = "# My Note\n\nBody text.";
+    const view = mount(doc);
+    // A fresh view's caret is at 0, on the duplicate line: the first focus
+    // revealed `# My Note` under the title until a click moved it away.
+    const pos = openingCaret(view.state);
+    expect(pos).toBe("# My Note\n".length);
+    view.dispatch({ selection: { anchor: pos! } });
+    view.dispatch({ effects: setFocused.of(true) });
+    expect(view.contentDOM.textContent).not.toContain("# My Note");
+    // Placed once; nothing further to move.
+    expect(openingCaret(view.state)).toBeNull();
+    expect(view.state.doc.toString()).toBe(doc);
+    view.destroy();
+
+    // No duplicate: the caret at 0 is visible text and stays.
+    const plain = mount("Body text.");
+    expect(openingCaret(plain.state)).toBeNull();
+    plain.destroy();
+  });
+
+  it("moves a peer's caret off the hidden duplicate to the visible body", () => {
+    const view = mount("# My Note\n\nBody text.");
+    const below = "# My Note\n".length;
+    expect(visibleBodyPos(view.state, 0)).toBe(below);
+    expect(visibleBodyPos(view.state, 5)).toBe(below);
+    expect(visibleBodyPos(view.state, below + 3)).toBe(below + 3);
+    // While OUR caret reveals the line, it is real text and keeps its place.
+    view.dispatch({ effects: setFocused.of(true), selection: { anchor: 3 } });
+    expect(visibleBodyPos(view.state, 0)).toBe(0);
+    view.destroy();
+
+    // Behind a Properties panel: the YAML has no line either.
+    const fm = mount("---\ntags: [a]\n---\nBody.");
+    expect(visibleBodyPos(fm.state, 0)).toBe("---\ntags: [a]\n---\n".length);
+    fm.destroy();
+
+    // A note that is only its duplicate heading has nowhere visible to go.
+    const only = mount("# My Note");
+    expect(visibleBodyPos(only.state, 0)).toBeNull();
+    only.destroy();
   });
 
   it("does not collapse a distinct or later H1", () => {
