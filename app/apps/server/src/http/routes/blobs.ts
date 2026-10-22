@@ -1897,6 +1897,7 @@ blobRoutes.get("/vaults/:vaultId/blobs", async (c) => {
 // ── download ────────────────────────────────────────────────────────────────
 interface DownloadRow {
   id: string;
+  sha256: string;
   vault_id: string | null;
   org_id: string | null;
   mime: string | null;
@@ -1940,7 +1941,7 @@ async function authorizeDownload(
 
   const id = c.req.param("id");
   const { rows } = await pool.query<DownloadRow>(
-    `SELECT id, vault_id, org_id, mime, rel_path, filename, size, status,
+    `SELECT id, sha256, vault_id, org_id, mime, rel_path, filename, size, status,
             storage_provider, storage_key, doc_id
        FROM blobs WHERE id = $1`,
     [id],
@@ -1988,7 +1989,23 @@ function downloadHeaders(row: DownloadRow, size: number, acceptRanges: boolean) 
     "X-Content-Type-Options": "nosniff",
     "Content-Disposition": "attachment",
     "Accept-Ranges": acceptRanges ? "bytes" : "none",
+    // Blobs are content-addressed: `sha256` is the hash of exactly these bytes
+    // (computed at upload / verified at complete), so the bytes behind an id
+    // never change. Only sent where the server itself serves the bytes, after
+    // the permission check.
+    ETag: `"${row.sha256}"`,
+    "Cache-Control": "private, max-age=31536000, immutable",
   };
+}
+
+/** True when an `If-None-Match` header matches `etag` (list, `*`, `W/` prefix). */
+function ifNoneMatchHit(header: string | undefined, etag: string): boolean {
+  if (!header) return false;
+  const want = etag.replace(/^W\//, "");
+  return header.split(",").some((part) => {
+    const t = part.trim();
+    return t === "*" || t.replace(/^W\//, "") === want;
+  });
 }
 
 /**
@@ -2030,6 +2047,13 @@ blobRoutes.get("/blobs/:id", async (c) => {
       return c.redirect(result.url, 302);
     }
     const headers = downloadHeaders(blob, result.size, result.acceptRanges);
+    if (ifNoneMatchHit(c.req.header("if-none-match"), headers.ETag)) {
+      result.body.destroy();
+      return new Response(null, {
+        status: 304,
+        headers: { ETag: headers.ETag, "Cache-Control": headers["Cache-Control"] },
+      });
+    }
     if (result.range) {
       return c.body(Readable.toWeb(result.body) as ReadableStream, 206, {
         ...headers,
