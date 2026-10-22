@@ -476,3 +476,58 @@ describe("ready.empty for a note that is not on disk yet", () => {
     expect(connects.order).toEqual([DOC]);
   });
 });
+
+// The remaining hole after the `ready.empty` probe fix: a server-only note this
+// device has never pushed is NOT on `ready.empty` once the probe skips it, but
+// `!isPushed` still put it on every content work list (`contentWorkList`, the
+// bulk engine's batch push, the per-doc uploader) — and the run read its file,
+// which the bootstrap / backfill had not created yet. One Rust ERROR per doc.
+describe("a never-pushed note whose file is still pending creation", () => {
+  it("is neither read nor queued while its placeholder is deferred", async () => {
+    fakeRegistry.deferredPathFor.mockImplementation((docId: string) => (docId === DOC ? REL : null));
+    fakeDisk.files.delete(REL);
+    try {
+      const sm = manager();
+      await enable(sm);
+      vi.mocked(ipc.readNote).mockClear();
+      vi.mocked(ipc.noteExists).mockClear();
+      await ready(sm, []);
+      expect(ipc.readNote).not.toHaveBeenCalledWith(REL, expect.anything());
+      expect(ipc.noteExists).not.toHaveBeenCalled();
+      expect(connects.order).toEqual([]);
+      expect(fakeRegistry.markPushed).not.toHaveBeenCalledWith(DOC);
+    } finally {
+      fakeRegistry.deferredPathFor.mockImplementation(() => null);
+    }
+  });
+
+  it("becomes ordinary work once the delivery has created the file", async () => {
+    fakeRegistry.deferredPathFor.mockImplementation((docId: string) => (docId === DOC ? REL : null));
+    fakeDisk.files.delete(REL);
+    try {
+      const sm = manager();
+      await enable(sm);
+      await ready(sm, []);
+      expect(connects.order).toEqual([]);
+      // The bootstrap / backfill wrote the file and cleared the pending entry.
+      fakeRegistry.deferredPathFor.mockImplementation(() => null);
+      fakeDisk.files.set(REL, "delivered text");
+      await ready(sm, []);
+      expect(connects.order).toEqual([DOC]);
+    } finally {
+      fakeRegistry.deferredPathFor.mockImplementation(() => null);
+    }
+  });
+
+  it("keeps today's behavior for a never-pushed note whose file the user deleted", async () => {
+    // Not pending: missing for another reason. It stays on the work list (its
+    // only copy may be the local CRDT) and the disk-delete drain still owns the
+    // delete; this change must not quietly drop it.
+    fakeDisk.files.delete(REL);
+    const sm = manager();
+    await enable(sm);
+    await ready(sm, []);
+    expect(fakeRegistry.deferredPathFor).toHaveBeenCalledWith(DOC);
+    expect(connects.order).toEqual([DOC]);
+  });
+});

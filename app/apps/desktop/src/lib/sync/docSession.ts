@@ -4330,6 +4330,24 @@ export class SyncManager implements InboundHost {
     return (this.uploader?.isRunning() ?? false) || this.batchPushing;
   }
 
+  /**
+   * Is this doc's FILE still waiting to be created by a bootstrap page or the
+   * vault channel's backfill (a deferred placeholder, see `deferredArrival.ts`
+   * and `registry.deferredPathFor`)?
+   *
+   * Such a doc is mapped and not yet `pushed`, so every "never pushed" work list
+   * used to queue it — and the push then read a file that is not on disk yet
+   * (one Rust ERROR per doc, thousands on a shared-vault join). It has no local
+   * content to push: the server is about to hand it over. It becomes ordinary
+   * work again once the delivery (or the placeholder fallback) clears the
+   * pending entry. A file missing for any OTHER reason is not pending, so it
+   * keeps today's handling (the disk-delete drain, and a never-pushed doc keeps
+   * its only copy).
+   */
+  private creationPending(docId: string): boolean {
+    return !!this.registry.deferredPathFor?.(docId);
+  }
+
   private contentWorkList(): Array<{ docId: string; relPath: string }> {
     const open = this.docStore?.suppressedDoc() ?? null;
     return this.registry
@@ -4337,6 +4355,7 @@ export class SyncManager implements InboundHost {
       .filter(
         (n) =>
           n.docId !== open &&
+          !this.creationPending(n.docId) &&
           // Settled as "nothing anywhere", or failed for a reason a retry can't
           // fix — neither is work (see the field comments).
           !this.emptyEverywhere.has(n.docId) &&
@@ -5627,6 +5646,8 @@ export class SyncManager implements InboundHost {
       .filter(
         (n) =>
           n.docId !== open &&
+          // Not on disk yet: the bootstrap / backfill is creating it.
+          !this.creationPending(n.docId) &&
           // Settled as "nothing anywhere", permanently refused, or already
           // owned by the per-doc follow-up — none of them are work here.
           !this.emptyEverywhere.has(n.docId) &&
@@ -5769,7 +5790,7 @@ export class SyncManager implements InboundHost {
     const progress = this.progress;
     if (!progress || docIds.length === 0) return;
     const notes = docIds
-      .filter((docId) => !this.backedOff(docId))
+      .filter((docId) => !this.backedOff(docId) && !this.creationPending(docId))
       .map((docId) => ({ docId, relPath: this.registry.pathForDocId(docId) }))
       .filter((n): n is { docId: string; relPath: string } => n.relPath != null);
     if (notes.length === 0) return;
@@ -5936,7 +5957,9 @@ export class SyncManager implements InboundHost {
 
     const uploader: ContentUploader = new ContentUploader({
       vaultId,
-      notes: this.registry.mappedNotes(),
+      // A doc whose file the bootstrap / backfill has not created yet is not
+      // work: its `!pushed` would queue it and the run would read a missing file.
+      notes: this.registry.mappedNotes().filter((n) => !this.creationPending(n.docId)),
       deps: {
         // Hold the doc in the hot tier (pinned) for the duration of its push, so
         // there is exactly ONE bridge for it even while the background feed is
