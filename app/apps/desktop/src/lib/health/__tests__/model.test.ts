@@ -156,7 +156,7 @@ describe("verdict precedence", () => {
       }),
     );
     expect(r.verdict).toBe("syncing");
-    expect(r.headline).toBe("Syncing — 40 of 100 updates");
+    expect(r.headline).toBe("Syncing: 40 of 100 updates");
     expect(stage(r, "server").state).toBe("busy");
   });
 
@@ -169,7 +169,7 @@ describe("verdict precedence", () => {
       }),
     );
     expect(r.verdict).toBe("syncing");
-    expect(r.headline).toBe("Uploading — 60 notes not uploaded yet");
+    expect(r.headline).toBe("Uploading: 60 notes not uploaded yet");
   });
 
   it("reports `attention` for any error-severity issue", () => {

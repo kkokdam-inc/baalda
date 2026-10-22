@@ -379,7 +379,7 @@ describe("Member profile page, Personal info and Activity tabs", () => {
     await render({ initialTab: "activity", onOpenNote });
     await flush();
     expect(entries()).toEqual([
-      "You edited 5 notes — Welcome, AGENTS, Keyboard shortcuts and 2 more",
+      "You edited 5 notes: Welcome, AGENTS, Keyboard shortcuts and 2 more",
       "You got Can view across the vault from Kamil Ali",
       "You edited One",
       "You edited Two",

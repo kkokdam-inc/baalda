@@ -76,7 +76,7 @@ describe("composeInspectionVerdict", () => {
 
   it("only claims a confirmation when BOTH the report and the checkpoint agree", () => {
     expect(v({ state: "synced", pushed: true })).toBe(
-      "Synced — the Remote Vault confirmed this note's content.",
+      "Synced. The Remote Vault confirmed this note's content.",
     );
     // A `synced` report with no durable checkpoint is not a confirmation, and
     // a checkpoint with a live `unsynced` state is not one either.
