@@ -14,9 +14,61 @@ export function relativeAgo(ts: number, now: number): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-/** True while the open vault has a bulk sync run in flight. */
+/**
+ * True while the open vault has a bulk sync run with OUTSTANDING work. A run
+ * opens its phases before it knows their size (the reconcile opens
+ * `registering` at 0, the bulk engine `downloading` at 0); a phase with
+ * nothing left to do is not news, and counting it kept the pill amber through
+ * the whole reconcile on every launch and switch. Display only: the sync
+ * layer's own gating (`liveSince`, the first pull) never reads this.
+ * `removing` always counts (its label is a remaining count of its own), and so
+ * does an upload with notes the server has never had (#258).
+ */
 export function isSyncRunActive(progress: SyncProgress | null | undefined): boolean {
-  return isBulkPhase(progress?.phase);
+  if (!progress || !isBulkPhase(progress.phase)) return false;
+  if (progress.phase === "removing") return true;
+  if (progress.phase === "uploading" && (progress.notUploaded ?? 0) > 0) return true;
+  return progress.total > progress.done;
+}
+
+/** How long a run that just appeared must last before the pill leaves green. */
+export const SYNC_RUN_HOLD_MS = 500;
+
+/**
+ * Whether the pill should SHOW a run as active: a run that just appeared is
+ * held back for {@link SYNC_RUN_HOLD_MS}, so a burst that finishes inside it
+ * never flickers green → amber → green. `activeSince` is when the run became
+ * active (null when it is not); real work past the hold shows its counts.
+ */
+export function shownRunActive(activeSince: number | null, now: number): boolean {
+  return activeSince != null && now - activeSince >= SYNC_RUN_HOLD_MS;
+}
+
+/** {@link isSyncRunActive}, held back by {@link shownRunActive}. */
+function useShownRunActive(progress: SyncProgress | null | undefined): boolean {
+  const active = isSyncRunActive(progress);
+  const [since, setSince] = useState<number | null>(null);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!active) {
+      setSince(null);
+      return;
+    }
+    const start = Date.now();
+    setSince((prev) => prev ?? start);
+    const t = setTimeout(() => setTick((n) => n + 1), SYNC_RUN_HOLD_MS);
+    return () => clearTimeout(t);
+  }, [active]);
+  return active && shownRunActive(since, Date.now());
+}
+
+/** The progress the pill renders: a run still inside its hold reads as settled. */
+export function heldProgress(
+  progress: SyncProgress | null | undefined,
+  shown: boolean,
+): SyncProgress | null | undefined {
+  if (!progress || shown || !isSyncRunActive(progress)) return progress;
+  return { ...progress, phase: "done" };
 }
 
 /** The run's completion as a whole percentage, or null when it has no total.
@@ -45,6 +97,11 @@ export function pillProgress(
   progress: SyncProgress | null | undefined,
 ): SyncProgress | null | undefined {
   if (progress?.phase === "error") return { ...progress, phase: "done" };
+  // A phase opened with nothing outstanding (see `isSyncRunActive`) reads as
+  // settled, so a vault with nothing to move is green, not "Syncing…".
+  if (progress && isBulkPhase(progress.phase) && !isSyncRunActive(progress)) {
+    return { ...progress, phase: "done" };
+  }
   return progress;
 }
 
@@ -246,7 +303,7 @@ export function SyncBadge({
   enabled,
   lastSyncedAt,
   pending,
-  progress,
+  progress: rawProgress,
   noteOpen,
   vaultStatus,
   rootMissing,
@@ -271,6 +328,10 @@ export function SyncBadge({
   /** The server's shrink brake (`store.syncPause`) — see {@link syncBadgeHold}. */
   pause?: SyncPause | null;
 }) {
+  // A run that just appeared is held back briefly so the pill never flickers
+  // amber for a burst that settles at once; past the hold its counts show.
+  const shown = useShownRunActive(rawProgress);
+  const progress = heldProgress(rawProgress, shown);
   const running = isSyncRunActive(progress);
   // Only tick the relative clock once we're settled (synced, nothing pending, no
   // bulk run — while one is live the label is a counter, not a timestamp).

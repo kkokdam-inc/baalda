@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  heldProgress,
   isSyncRunActive,
+  shownRunActive,
+  SYNC_RUN_HOLD_MS,
   syncBadgeHold,
   syncBadgeLabel,
   syncBadgeTone,
@@ -143,14 +146,28 @@ describe("syncBadgeLabel with a bulk sync run", () => {
     ).toBe("Syncing 9/10 updates");
   });
 
-  it("falls back to the indeterminate label when the run has no total yet", () => {
-    expect(
-      syncBadgeLabel({
-        status: "synced",
-        now,
-        progress: run({ phase: "registering", done: 0, total: 0 }),
-      }),
-    ).toBe("Syncing…");
+  it("stays green while a run has opened a phase with nothing to do yet", () => {
+    // The reconcile opens `registering` at 0 and the bulk engine `downloading`
+    // at 0 before either knows of any work; that is not news for the pill.
+    for (const phase of ["registering", "downloading", "uploading"] as const) {
+      const progress = run({ phase, done: 0, total: 0 });
+      expect(isSyncRunActive(progress)).toBe(false);
+      expect(syncBadgeLabel({ status: "synced", now, progress })).not.toMatch(/^Syncing/);
+      expect(syncBadgeTone({ status: "synced", progress })).toBe("synced");
+      expect(syncBadgeLabel({ status: "synced", now, progress, noteOpen: false })).toBe("Synced");
+      expect(syncBadgeTone({ status: "synced", progress, noteOpen: false })).toBe("synced");
+    }
+  });
+
+  it("still shows counts once a phase has real work outstanding", () => {
+    const progress = run({ phase: "downloading", done: 3, total: 40 });
+    expect(isSyncRunActive(progress)).toBe(true);
+    expect(syncBadgeLabel({ status: "synced", now, progress })).toBe("Syncing 3/40 updates");
+    expect(syncBadgeTone({ status: "synced", progress })).toBe("connecting");
+    // A phase whose work is all done is settled again.
+    expect(isSyncRunActive(run({ phase: "downloading", done: 40, total: 40 }))).toBe(false);
+    // An upload with notes the server never had stays live whatever its counts.
+    expect(isSyncRunActive(run({ phase: "uploading", done: 0, total: 0, notUploaded: 2 }))).toBe(true);
   });
 
   it("reads Synced — never 'N not synced' — when a run ends with failed notes", () => {
@@ -217,7 +234,8 @@ describe("syncBadgeLabel with a bulk sync run", () => {
     expect(isSyncRunActive(run({ phase: "done" }))).toBe(false);
     expect(isSyncRunActive(run({ phase: "error" }))).toBe(false);
     for (const phase of ["registering", "uploading", "downloading"] as const) {
-      expect(isSyncRunActive(run({ phase }))).toBe(true);
+      expect(isSyncRunActive(run({ phase, done: 1, total: 5 }))).toBe(true);
+      expect(isSyncRunActive(run({ phase, done: 0, total: 0 }))).toBe(false);
     }
   });
 
@@ -406,5 +424,31 @@ describe("a stopped run with refusals or a failing pull", () => {
       expect(syncBadgeLabel({ status: "read-only", now, progress })).toBe("Read-only");
       expect(syncBadgeTone({ status: "read-only", progress })).toBe("read-only");
     }
+  });
+});
+
+describe("the hold before a new run turns the pill amber", () => {
+  const busy: SyncProgress = { phase: "downloading", done: 2, total: 50, failed: 0 };
+
+  it("holds a run that just appeared, then shows it", () => {
+    const t0 = 1_000;
+    expect(SYNC_RUN_HOLD_MS).toBeGreaterThanOrEqual(400);
+    expect(SYNC_RUN_HOLD_MS).toBeLessThanOrEqual(600);
+    expect(shownRunActive(null, t0)).toBe(false);
+    expect(shownRunActive(t0, t0)).toBe(false);
+    expect(shownRunActive(t0, t0 + SYNC_RUN_HOLD_MS - 1)).toBe(false);
+    expect(shownRunActive(t0, t0 + SYNC_RUN_HOLD_MS)).toBe(true);
+  });
+
+  it("renders a held run as settled and a shown run as itself", () => {
+    const held = heldProgress(busy, false);
+    expect(held?.phase).toBe("done");
+    expect(syncBadgeTone({ status: "synced", progress: held })).toBe("synced");
+    expect(heldProgress(busy, true)).toBe(busy);
+    expect(syncBadgeTone({ status: "synced", progress: heldProgress(busy, true) })).toBe("connecting");
+    // Nothing to hold: inactive progress passes through untouched.
+    const quiet: SyncProgress = { phase: "registering", done: 0, total: 0, failed: 0 };
+    expect(heldProgress(quiet, false)).toBe(quiet);
+    expect(heldProgress(null, false)).toBeNull();
   });
 });
