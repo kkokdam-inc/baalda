@@ -10,6 +10,10 @@
 //   2. a note's basename (without `.md`)             — case-insensitive
 //   3. a note's title                                — case-insensitive
 //
+// Every comparison goes through `linkKey` (NFC, then lower-case): macOS hands
+// back file names decomposed (NFD) while typed link text is usually composed
+// (NFC), so `[[한글]]` must match `한글.md` whichever form either side is in.
+//
 // Rust has a fourth rule — a tree binary (`[[Q3 report.xlsx]]`) by path or
 // basename — and `titles` lists notes only, so a target that names a surfaced
 // non-note file type is never greyed: we cannot see the files table from here,
@@ -26,6 +30,11 @@ export function wikilinkTarget(inner: string): string {
   return t;
 }
 
+/** The comparison key for link targets, paths and titles: NFC, lower-cased. */
+export function linkKey(s: string): string {
+  return s.normalize("NFC").toLowerCase();
+}
+
 interface TitleIndex {
   paths: Set<string>;
   bases: Set<string>;
@@ -39,14 +48,14 @@ function indexFor(titles: readonly NoteTitle[]): TitleIndex {
   if (cached) return cached;
   const idx: TitleIndex = { paths: new Set(), bases: new Set(), titles: new Set() };
   for (const t of titles) {
-    const path = t.path.toLowerCase();
+    const path = linkKey(t.path);
     // Rust matches `<target>.md`, so only `.md` paths answer rules 1 and 2.
     if (path.endsWith(".md")) {
       const stem = path.slice(0, -3);
       idx.paths.add(stem);
       idx.bases.add(stem.slice(stem.lastIndexOf("/") + 1));
     }
-    if (t.title) idx.titles.add(t.title.toLowerCase());
+    if (t.title) idx.titles.add(linkKey(t.title));
   }
   indexCache.set(titles, idx);
   return idx;
@@ -69,7 +78,7 @@ export function isWikilinkResolved(inner: string, titles: readonly NoteTitle[]):
   if (!target) return false;
   if (looksLikeFileTarget(target)) return true;
   const idx = indexFor(titles);
-  const lower = target.toLowerCase();
+  const lower = linkKey(target);
   if (idx.paths.has(lower)) return true;
   const base = lower.slice(lower.lastIndexOf("/") + 1);
   if (idx.bases.has(base)) return true;

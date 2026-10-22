@@ -102,6 +102,9 @@ rustls = { version = "0.23", default-features = false, features = [
 # reqwest/hyper; naming them here only makes the dependency honest.
 tokio = { version = "1", default-features = false, features = ["fs", "io-util", "sync", "process", "time", "rt"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io"] }
+# NFC-fold wiki-link targets, paths and titles before comparing them: macOS
+# returns file names decomposed (NFD) while typed link text is composed (NFC).
+unicode-normalization = "0.1"
 
 # The updater is desktop-only — gate it so mobile targets don't try to build it.
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

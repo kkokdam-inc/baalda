@@ -19,6 +19,7 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
 use walkdir::WalkDir;
 
@@ -147,6 +148,16 @@ fn set_disk_base_on(conn: &Connection, doc_id: &str, sha256: &str) -> AppResult<
         params![doc_id, sha256, now_ms],
     )?;
     Ok(())
+}
+
+/// The comparison key for wiki-link targets, note paths, basenames and titles:
+/// NFC, then lower-cased. macOS hands back file names decomposed (NFD) while
+/// typed link text is usually composed (NFC), so `[[한글]]` must match
+/// `한글.md` whichever form either side is in (#332). Only comparisons use it;
+/// stored paths and files on disk keep whatever form they arrived in. Mirrored
+/// by `linkKey` in `src/lib/editor/wikilinkResolve.ts`.
+fn link_key(s: &str) -> String {
+    s.nfc().collect::<String>().to_lowercase()
 }
 
 pub struct Index {
@@ -1668,15 +1679,15 @@ impl Index {
             })?;
             for row in rows {
                 let (id, path, title) = row?;
-                let base = path
-                    .rsplit('/')
-                    .next()
-                    .unwrap_or(&path)
-                    .trim_end_matches(".md")
-                    .to_lowercase();
+                let base = link_key(
+                    path.rsplit('/')
+                        .next()
+                        .unwrap_or(&path)
+                        .trim_end_matches(".md"),
+                );
                 by_basename.entry(base).or_insert_with(|| id.clone());
                 if let Some(t) = title {
-                    by_title.entry(t.to_lowercase()).or_insert(id);
+                    by_title.entry(link_key(&t)).or_insert(id);
                 }
             }
         }
@@ -1743,15 +1754,15 @@ impl Index {
             tx.prepare("UPDATE links SET dst_note_id = ?1 WHERE id = ?2 AND dst_note_id IS NOT ?1")?;
         for (link_id, raw) in links {
             // raw may contain alias/heading — strip for matching.
-            let target = raw
-                .split('|')
-                .next()
-                .unwrap_or("")
-                .split('#')
-                .next()
-                .unwrap_or("")
-                .trim()
-                .to_lowercase();
+            let target = link_key(
+                raw.split('|')
+                    .next()
+                    .unwrap_or("")
+                    .split('#')
+                    .next()
+                    .unwrap_or("")
+                    .trim(),
+            );
             let base = target
                 .rsplit('/')
                 .next()
@@ -2044,6 +2055,11 @@ impl Index {
 
     /// Resolve a wiki-link target to a note: by full relative path, then by
     /// basename (case-insensitive), then by title. Mirrors `resolve_links`.
+    ///
+    /// Every comparison goes through `link_key` (NFC + lower-case) on BOTH
+    /// sides, in Rust rather than SQL: SQLite's `lower()` folds ASCII only and
+    /// knows nothing of Unicode normalization, so an NFD file name never
+    /// matched an NFC link (#332).
     pub fn resolve_wikilink(&self, name: &str) -> AppResult<Option<ResolvedLink>> {
         let target = name
             .split('|')
@@ -2058,57 +2074,49 @@ impl Index {
         if target.is_empty() {
             return Ok(None);
         }
-        let base = target.rsplit('/').next().unwrap_or(&target).to_string();
+        let target_key = link_key(&target);
+        let base_key = target_key
+            .rsplit('/')
+            .next()
+            .unwrap_or(&target_key)
+            .to_string();
 
-        let map = |r: &rusqlite::Row| {
-            Ok(ResolvedLink {
-                id: r.get(0)?,
-                path: r.get(1)?,
+        let notes: Vec<(String, String, Option<String>)> = {
+            let mut stmt = self.conn.prepare("SELECT id, path, title FROM notes")?;
+            let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+            rows.collect::<Result<Vec<_>, _>>()?
+        };
+        let path_keys: Vec<String> = notes.iter().map(|(_, path, _)| link_key(path)).collect();
+        let hit = |i: usize| {
+            let (id, path, _) = &notes[i];
+            Some(ResolvedLink {
+                id: id.clone(),
+                path: path.clone(),
             })
         };
 
         // 1. Full relative path (e.g. "Projects/Baalda").
-        let full_md = format!("{target}.md");
-        if let Some(hit) = self
-            .conn
-            .query_row(
-                "SELECT id, path FROM notes WHERE lower(path) = lower(?1) LIMIT 1",
-                params![full_md],
-                map,
-            )
-            .optional()?
-        {
-            return Ok(Some(hit));
+        let full_md = format!("{target_key}.md");
+        if let Some(i) = path_keys.iter().position(|p| *p == full_md) {
+            return Ok(hit(i));
         }
 
         // 2. Basename anywhere in the tree.
-        let base_md = format!("{base}.md");
-        let base_like = format!("%/{base}.md");
-        if let Some(hit) = self
-            .conn
-            .query_row(
-                "SELECT id, path FROM notes
-                 WHERE lower(path) = lower(?1) OR lower(path) LIKE lower(?2)
-                 LIMIT 1",
-                params![base_md, base_like],
-                map,
-            )
-            .optional()?
+        let base_md = format!("{base_key}.md");
+        let base_suffix = format!("/{base_md}");
+        if let Some(i) = path_keys
+            .iter()
+            .position(|p| *p == base_md || p.ends_with(&base_suffix))
         {
-            return Ok(Some(hit));
+            return Ok(hit(i));
         }
 
         // 3. Title.
-        if let Some(hit) = self
-            .conn
-            .query_row(
-                "SELECT id, path FROM notes WHERE lower(title) = lower(?1) LIMIT 1",
-                params![target],
-                map,
-            )
-            .optional()?
+        if let Some(i) = notes
+            .iter()
+            .position(|(_, _, t)| t.as_deref().is_some_and(|t| link_key(t) == target_key))
         {
-            return Ok(Some(hit));
+            return Ok(hit(i));
         }
 
         // 4. A tree binary, by full path or basename — `[[Q3 report.xlsx]]`
@@ -2121,19 +2129,24 @@ impl Index {
         // format registry to the right viewer) and never treats it as a note.
         // `links`/the graph are untouched — a link to a binary is not an edge in
         // the note graph.
-        let base = target.rsplit('/').next().unwrap_or(&target).to_string();
-        let base_like = format!("%/{base}");
-        Ok(self
+        let base_suffix = format!("/{base_key}");
+        let mut stmt = self
             .conn
-            .query_row(
-                "SELECT id, path FROM files
-                  WHERE lower(path) = lower(?1) OR lower(path) = lower(?2)
-                     OR lower(path) LIKE lower(?3)
-                  ORDER BY length(path) LIMIT 1",
-                params![target, base, base_like],
-                map,
-            )
-            .optional()?)
+            .prepare("SELECT id, path FROM files ORDER BY length(path)")?;
+        let rows = stmt.query_map([], |r| {
+            Ok(ResolvedLink {
+                id: r.get(0)?,
+                path: r.get(1)?,
+            })
+        })?;
+        for row in rows {
+            let file = row?;
+            let p = link_key(&file.path);
+            if p == target_key || p == base_key || p.ends_with(&base_suffix) {
+                return Ok(Some(file));
+            }
+        }
+        Ok(None)
     }
 
     /// All note titles (for the `[[` autocomplete list).
@@ -4544,6 +4557,60 @@ mod tests {
         let r = idx.resolve_wikilink("Beta").unwrap().unwrap();
         assert_eq!(r.path, "sub/Beta.md");
         assert!(idx.resolve_wikilink("Nonexistent").unwrap().is_none());
+    }
+
+    /// #332: macOS returns file names decomposed (NFD) while typed link text is
+    /// composed (NFC). Both the stored `links` resolution and a clicked link
+    /// must match across the two forms, in either direction.
+    #[test]
+    fn wikilinks_resolve_across_unicode_normalization_forms() {
+        use unicode_normalization::UnicodeNormalization;
+        let nfc: String = "한글".nfc().collect();
+        let nfd: String = "한글".nfd().collect();
+        let cafe_nfd: String = "Café".nfd().collect();
+        assert_ne!(nfc, nfd);
+
+        let tmp = tempfile::tempdir().unwrap();
+        let v = tmp.path().to_path_buf();
+        // An NFD file linked in NFC, and an NFC-titled note linked in NFD.
+        write_note(&v, &format!("sub/{nfd}.md"), "Korean note.").unwrap();
+        write_note(&v, "Titled.md", &format!("# {nfc} 제목\n\nbody")).unwrap();
+        write_note(&v, &format!("{cafe_nfd}.md"), "Accented.").unwrap();
+        write_note(
+            &v,
+            "Source.md",
+            &format!("See [[{nfc}]], [[{nfd} 제목]] and [[CAFÉ]]."),
+        )
+        .unwrap();
+
+        let idx = Index::open(&v).unwrap();
+        idx.rebuild(&v).unwrap();
+
+        // Clicked links (resolve_wikilink).
+        let korean = idx.resolve_wikilink(&nfc).unwrap().expect("NFC link → NFD file");
+        assert!(korean.path.ends_with(".md") && korean.path.starts_with("sub/"));
+        let by_path = idx
+            .resolve_wikilink(&format!("sub/{nfc}"))
+            .unwrap()
+            .expect("NFC full path → NFD file");
+        assert_eq!(by_path.id, korean.id);
+        let titled = idx
+            .resolve_wikilink(&format!("{nfd} 제목"))
+            .unwrap()
+            .expect("NFD link → NFC title");
+        assert_eq!(titled.path, "Titled.md");
+        let cafe = idx
+            .resolve_wikilink("CAFÉ")
+            .unwrap()
+            .expect("NFC upper-case link → NFD lower-case file");
+        assert_eq!(cafe.path.nfc().collect::<String>(), "Café.md");
+
+        // Stored link resolution (resolve_links → backlinks).
+        for target in [&korean.id, &titled.id, &cafe.id] {
+            let backlinks = idx.get_backlinks(target).unwrap();
+            assert_eq!(backlinks.len(), 1, "one backlink to {target}");
+            assert_eq!(backlinks[0].path, "Source.md");
+        }
     }
 
     // ---- CRDT persistence (spec 02 §4) -----------------------------------

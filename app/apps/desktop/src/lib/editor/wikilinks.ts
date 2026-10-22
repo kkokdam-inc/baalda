@@ -32,7 +32,7 @@ import {
 } from "@codemirror/view";
 import type { NoteTitle } from "../ipc";
 import { focusMoved, selectionTouches } from "./reveal";
-import { isWikilinkResolved } from "./wikilinkResolve";
+import { isWikilinkResolved, linkKey } from "./wikilinkResolve";
 
 /**
  * `[[target]]`, `[[target|alias]]`, `[[target#heading]]` — a FRESH regex per
@@ -59,14 +59,14 @@ export function wikilinkCompletions(opts: WikilinkOptions) {
     if (!before) return null;
     if (before.from === before.to && !context.explicit) return null;
 
-    const typed = before.text.slice(2).toLowerCase();
+    const typed = linkKey(before.text.slice(2));
     const options: Completion[] = opts
       .getTitles()
       .filter((t) => {
         const base = t.path.split("/").pop()?.replace(/\.md$/i, "") ?? "";
         return (
-          t.title.toLowerCase().includes(typed) ||
-          base.toLowerCase().includes(typed)
+          linkKey(t.title).includes(typed) ||
+          linkKey(base).includes(typed)
         );
       })
       .slice(0, 50)
