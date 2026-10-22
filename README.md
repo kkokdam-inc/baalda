@@ -128,6 +128,14 @@ Everything else (the desktop app, the search index, the sync server) is a rebuil
 
 ## Getting started
 
+Just want the app? [Download it](https://baalda.com/download) for macOS, Windows or Linux.
+
+> **Windows:** the installer isn't code-signed yet, so SmartScreen may say
+> "Windows protected your PC". Click **More info → Run anyway** to install.
+> Updates after that install automatically without the warning.
+
+To build and run it yourself instead:
+
 ### Prerequisites
 
 - **Node.js** ≥ 22 (with corepack: `corepack enable` activates the pinned pnpm)
