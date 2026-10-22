@@ -8,6 +8,7 @@ import { verifyVaultToken } from "../tokens/vault-token.js";
 import { listReadableDocsInVault, type SharedVaultReads } from "../permissions/vault-docs.js";
 import { listEmptyDocs, loadDocDiff } from "../yjs/persistence.js";
 import { deletedNotesAmong } from "../trash/access.js";
+import { pool } from "../db/pool.js";
 import { observeCount } from "../metrics/sync-metrics.js";
 import {
   parseHello,
@@ -1012,7 +1013,25 @@ class VaultConnection {
     const prioritized = priority.filter((d) => this.readable.has(d));
     const prioritySet = new Set(prioritized);
     const rest = [...this.readable].filter((d) => !prioritySet.has(d));
-    const ordered = [...prioritized, ...rest];
+    let ordered = [...prioritized, ...rest];
+    // The readable set also names binary tree files (`files` ids), which never
+    // carry Yjs state: `loadDiff` would spend 1-3 queries each to answer null.
+    // Drop ids that are a `files` row and NOT a `notes` row. Best-effort: on a
+    // failed lookup nothing is skipped.
+    try {
+      const { rows } = await pool.query<{ id: string }>(
+        `SELECT f.id FROM files f
+          WHERE f.id = ANY($1::text[])
+            AND NOT EXISTS (SELECT 1 FROM notes n WHERE n.id = f.id)`,
+        [ordered],
+      );
+      if (rows.length > 0) {
+        const fileIds = new Set(rows.map((r) => r.id));
+        ordered = ordered.filter((d) => !fileIds.has(d));
+      }
+    } catch {
+      // fall through with the full list
+    }
     await runPool(ordered, this.deps.concurrency, (docId) =>
       this.sendDocBackfill(docId, manifest[docId]),
     );
