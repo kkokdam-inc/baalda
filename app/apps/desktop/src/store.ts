@@ -5371,13 +5371,15 @@ export const useStore = create<AppStore>((set, get) => ({
         rememberLastVault(orgId);
         // Reconcile may have materialized server-only notes onto disk; refresh so
         // the sidebar reflects the full vault, not just what was already local.
-        await get().refreshTree();
-        if (stale()) return;
-        await get().refreshTitles();
-        if (stale()) return;
-        await get().refreshLocks();
-        if (stale()) return;
-        await get().refreshVaultSettings();
+        // Independent reads (disk tree, index titles, server locks, server
+        // settings): run them together instead of four serial round trips.
+        // Each one re-checks its own vault epoch before writing state.
+        await Promise.all([
+          get().refreshTree(),
+          get().refreshTitles(),
+          get().refreshLocks(),
+          get().refreshVaultSettings(),
+        ]);
         if (stale()) return;
         // A brand-new vault was just seeded with welcome content — greet the
         // user with the welcome note if nothing else is open.
