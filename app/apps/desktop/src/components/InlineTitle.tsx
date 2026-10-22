@@ -1,11 +1,27 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { frontmatterField } from "../lib/editor/frontmatter";
 import { bodyStart, getHeaderFocus, registerHeaderFocus } from "../lib/editor/headerFocus";
 import { addPropertyToNote, viewOnlyNotice } from "./properties/PropertiesPanel";
 import { planInlineTitleRename, TITLE_REFUSAL_MESSAGE } from "../lib/editor/titlePlan";
+import {
+  clearTitlePresence,
+  noteAwareness,
+  publishTitlePresence,
+  readTitlePeers,
+  titleCaretX,
+  type TitlePeer,
+} from "../lib/editor/titlePresence";
 import { stemOf } from "../lib/notePath";
 import { useStore } from "../store";
+
+/** A teammate's title caret, resolved to offsets within `.inline-title-wrap`. */
+interface TitleCaret extends TitlePeer {
+  left: number;
+  top: number;
+  height: number;
+  flip: boolean;
+}
 
 /**
  * The note's name, at the top of the note, as a real `<input>`.
@@ -45,6 +61,8 @@ export function InlineTitle({
   pathRef.current = path;
   const readOnlyRef = useRef(readOnly);
   readOnlyRef.current = readOnly;
+  // The note's awareness (null for views without sync, e.g. version preview).
+  const awareness = view.state.facet(noteAwareness);
 
   // Access revoked while a rename was being typed: the draft is void. Renaming
   // needs edit permission on the server (PATCH /api/notes/:id), so a commit
@@ -53,9 +71,76 @@ export function InlineTitle({
     if (!readOnly) return;
     setDraft(null);
     setWarning(null);
-  }, [readOnly]);
+    if (awareness) clearTitlePresence(awareness);
+  }, [readOnly, awareness]);
 
   const value = draft ?? stem;
+
+  // ---- Title presence: publish ours, draw teammates' (see titlePresence.ts).
+  // Subscribed here rather than through the widget's `eq()`, so a teammate
+  // moving in the title never re-mounts the widget or steals our focus.
+  const [peers, setPeers] = useState<TitlePeer[]>([]);
+  const [carets, setCarets] = useState<TitleCaret[]>([]);
+  const [measureTick, remeasure] = useReducer((n: number) => n + 1, 0);
+
+  const publish = useCallback(() => {
+    const el = inputRef.current;
+    if (!awareness || !el || readOnlyRef.current) return;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    publishTitlePresence(awareness, start, end, el.selectionDirection === "backward");
+  }, [awareness]);
+
+  useEffect(() => {
+    if (!awareness) return;
+    let last = "";
+    const onChange = () => {
+      const next = readTitlePeers(awareness);
+      const key = JSON.stringify(next);
+      if (key === last) return; // our own publishes, body-only moves
+      last = key;
+      setPeers(next);
+    };
+    onChange();
+    awareness.on("change", onChange);
+    return () => {
+      awareness.off("change", onChange);
+      clearTitlePresence(awareness);
+    };
+  }, [awareness]);
+
+  // Measured after commit, so the input already holds `value` and its scroll.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el || peers.length === 0) {
+      setCarets((prev) => (prev.length ? [] : prev));
+      return;
+    }
+    const style = getComputedStyle(el);
+    const padTop = parseFloat(style.paddingTop) || 0;
+    const height = el.clientHeight - padTop - (parseFloat(style.paddingBottom) || 0);
+    const top = el.offsetTop + (parseFloat(style.borderTopWidth) || 0) + padTop;
+    // Hang the flag below when there is no room above (same rule as the body).
+    const flip =
+      el.getBoundingClientRect().top - view.scrollDOM.getBoundingClientRect().top < 20;
+    setCarets(
+      peers.map((p) => ({
+        ...p,
+        left: el.offsetLeft + titleCaretX(el, p.caret),
+        top,
+        height,
+        flip,
+      })),
+    );
+  }, [peers, value, measureTick, view]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => remeasure());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const commit = useCallback(async () => {
     const typed = draftRef.current;
@@ -160,7 +245,11 @@ export function InlineTitle({
           if (readOnly) return;
           setWarning(null);
           setDraft(e.target.value);
+          publish();
         }}
+        onFocus={publish}
+        onSelect={publish}
+        onScroll={remeasure}
         onKeyDown={(e) => {
           if (
             readOnly &&
@@ -193,8 +282,29 @@ export function InlineTitle({
             addPropertyToNote(view);
           }
         }}
-        onBlur={() => void commit()}
+        onBlur={() => {
+          if (awareness) clearTitlePresence(awareness);
+          void commit();
+        }}
       />
+      {carets.length > 0 && (
+        <div className="cm-remoteCaretLayer inline-title-carets" aria-hidden="true">
+          {carets.map((c) => (
+            <div
+              key={c.clientId}
+              className={c.flip ? "cm-remoteCaret flip" : "cm-remoteCaret"}
+              style={{
+                ["--rc" as string]: c.color,
+                height: `${c.height}px`,
+                transform: `translate(${c.left}px, ${c.top}px)`,
+              }}
+            >
+              <div className="cm-remoteCaret-bar" />
+              <div className="cm-remoteCaret-label">{c.name}</div>
+            </div>
+          ))}
+        </div>
+      )}
       {warning && (
         <p className="inline-title-warning" role="alert">
           {warning}

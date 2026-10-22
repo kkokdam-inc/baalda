@@ -15,6 +15,7 @@ import type { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
 import { insideFold } from "./folding";
 import { visibleBodyPos } from "./livePreview";
+import { noteAwareness, titlePresenceOf } from "./titlePresence";
 
 /** Dispatched to nudge the layer into recomputing when awareness changes. */
 const remoteCursorsSync = Annotation.define<boolean>();
@@ -52,6 +53,9 @@ function readCursors(view: EditorView, ytext: Y.Text, awareness: Awareness): Rem
   const cursors: RemoteCursor[] = [];
   awareness.getStates().forEach((state, clientId) => {
     if (clientId === awareness.clientID) return; // never draw our own caret
+    // Focused in the title: yCollab left `cursor` at their last body spot, so
+    // drawing it here would show them in two places. The title draws theirs.
+    if (titlePresenceOf(state)) return;
     const cursor = state.cursor;
     if (!cursor || cursor.head == null) return;
     const abs = Y.createAbsolutePositionFromRelativePosition(cursor.head, ydoc);
@@ -199,5 +203,6 @@ export function remoteCursors(ytext: Y.Text, awareness: Awareness): Extension {
     },
   });
 
-  return [nudge, cursorLayer];
+  // The title widget reads the same awareness to publish and draw title carets.
+  return [noteAwareness.of(awareness), nudge, cursorLayer];
 }

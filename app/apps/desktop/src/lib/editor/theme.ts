@@ -775,6 +775,8 @@ export const editorThemeSpec: Record<string, Record<string, string>> = {
     paddingBottom: "var(--inline-title-gap)",
   },
   ".inline-title-wrap": {
+    // Positioned so the remote title carets can sit on the input's offsets.
+    position: "relative",
     display: "flex",
     flexDirection: "column",
     gap: "var(--sp-1)",
@@ -793,6 +795,16 @@ export const editorThemeSpec: Record<string, Record<string, string>> = {
     fontWeight: "var(--inline-title-weight)",
     lineHeight: "var(--lh-tight)",
     color: "var(--inline-title-color)",
+  },
+  // Teammates' carets in the title (see InlineTitle). Children reuse the body's
+  // `.cm-remoteCaret` styles and are placed with `transform`, like the layer's.
+  ".inline-title-carets": {
+    position: "absolute",
+    top: "0",
+    left: "0",
+    width: "0",
+    height: "0",
+    pointerEvents: "none",
   },
   ".inline-title-input::placeholder": {
     color: "var(--inline-title-placeholder)",
