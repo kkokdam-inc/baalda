@@ -160,6 +160,18 @@ fn link_key(s: &str) -> String {
     s.nfc().collect::<String>().to_lowercase()
 }
 
+fn read_yjs_state_vectors(conn: &Connection) -> AppResult<Vec<YjsStateVector>> {
+    let mut stmt =
+        conn.prepare("SELECT doc_id, state_vector FROM yjs_snapshot WHERE state_vector IS NOT NULL")?;
+    let rows = stmt.query_map([], |r| {
+        Ok(YjsStateVector {
+            doc_id: r.get(0)?,
+            state_vector: r.get::<_, Vec<u8>>(1)?,
+        })
+    })?;
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
+}
+
 pub struct Index {
     conn: Connection,
     /// Test-only: how many times `resolve_links` has run. The entire point of
@@ -2425,16 +2437,24 @@ impl Index {
     /// Every doc we hold a state vector for, for the sync manifest. Cheap: one
     /// scan of a table with one small row per doc, and no Y.Doc is rebuilt.
     pub fn list_yjs_state_vectors(&self) -> AppResult<Vec<YjsStateVector>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT doc_id, state_vector FROM yjs_snapshot WHERE state_vector IS NOT NULL",
-        )?;
-        let rows = stmt.query_map([], |r| {
-            Ok(YjsStateVector {
-                doc_id: r.get(0)?,
-                state_vector: r.get::<_, Vec<u8>>(1)?,
-            })
-        })?;
-        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+        read_yjs_state_vectors(&self.conn)
+    }
+
+    /// The same listing over a SEPARATE read-only connection to the vault's
+    /// index file. Under WAL a reader never waits on the rebuild's writer, so
+    /// the sync manifest does not queue behind the open-time index rebuild. The
+    /// rebuild never touches the CRDT tables, so the answer is identical.
+    /// Errors (no file yet, no `-shm` access) mean the caller should fall back
+    /// to the locked path.
+    pub fn list_yjs_state_vectors_readonly(vault: &Path) -> AppResult<Vec<YjsStateVector>> {
+        let db_path = vault.join(".context").join("index.sqlite");
+        let conn = Connection::open_with_flags(
+            &db_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|e| AppError::new(format!("Couldn't open the index read-only: {e}")))?;
+        conn.pragma_update(None, "busy_timeout", 5000)?;
+        read_yjs_state_vectors(&conn)
     }
 
     // ---- Bulk sync batches (the bootstrap + materialize commands) --------
@@ -3230,6 +3250,26 @@ fn html_escape(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn readonly_state_vectors_match_locked_path_while_primary_is_open() {
+        let tmp = tempfile::tempdir().unwrap();
+        let v = tmp.path().to_path_buf();
+        let idx = Index::open(&v).unwrap();
+        idx.save_yjs_state_vectors(&[
+            ("doc-a".to_string(), vec![1, 2, 3]),
+            ("doc-b".to_string(), vec![4, 5]),
+        ])
+        .unwrap();
+        let sorted = |mut r: Vec<YjsStateVector>| {
+            r.sort_by(|a, b| a.doc_id.cmp(&b.doc_id));
+            r.into_iter().map(|x| (x.doc_id, x.state_vector)).collect::<Vec<_>>()
+        };
+        let locked = sorted(idx.list_yjs_state_vectors().unwrap());
+        let ro = sorted(Index::list_yjs_state_vectors_readonly(&v).unwrap());
+        assert_eq!(locked.len(), 2);
+        assert_eq!(locked, ro);
+    }
     use super::*;
     use crate::notefile::write_note;
 
