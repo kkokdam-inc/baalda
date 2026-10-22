@@ -5,7 +5,7 @@ import { testAppDeps } from "./helpers/app.js";
 import { pool } from "../src/db/pool.js";
 import { resetDb } from "./helpers/db.js";
 import { signUp } from "./helpers/auth.js";
-import { seedMember, seedOrg, seedVault } from "./helpers/seed.js";
+import { seedMember, seedOrg, seedVault, seedVaultGrant } from "./helpers/seed.js";
 
 const app = createApp(testAppDeps());
 
@@ -31,6 +31,9 @@ describe("blob download caching headers", () => {
     const org = await seedOrg("Acme", "acme-etag");
     await seedMember(org, owner.userId, "owner");
     const vault = await seedVault(org);
+    // New vaults are shared with their team; an unshared one withdraws the
+    // owner shortcut, and attachment reads need vault-wide access.
+    await seedVaultGrant(org, "edit");
     const bytes = new Uint8Array([1, 2, 3, 4, 5]);
     const up = await app.fetch(
       new Request(`http://local/api/vaults/${vault}/blobs`, {
