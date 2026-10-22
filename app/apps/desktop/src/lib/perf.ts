@@ -28,8 +28,39 @@ export function attachEarlySink(sink: (line: string) => void): void {
   early.length = 0;
 }
 
+// Release builds have no console mirror (devConsole.ts is dev-only), so the
+// marks would reach only the Web Inspector and the launch could not be measured
+// from the log file. Write each `[boot]` line through the Tauri log plugin
+// instead: one Info line per mark, names and timings only (no paths or ids).
+// The plugin loads asynchronously; lines before it resolves are queued.
+let releaseSink: ((line: string) => void) | null = null;
+const releaseQueue: string[] = [];
+let releaseSinkRequested = false;
+
+function writeToLogFile(line: string): void {
+  if (releaseSink) {
+    releaseSink(line);
+    return;
+  }
+  releaseQueue.push(line);
+  if (releaseSinkRequested) return;
+  releaseSinkRequested = true;
+  void import("@tauri-apps/plugin-log")
+    .then(({ info }) => {
+      releaseSink = (l) => void info(l).catch(() => {});
+      for (const l of releaseQueue.splice(0)) releaseSink(l);
+    })
+    .catch(() => {
+      releaseQueue.length = 0; // no plugin (tests, plain browser): console only
+    });
+}
+
 function emit(line: string): void {
   console.info(line);
+  if (!import.meta.env.DEV) {
+    writeToLogFile(line);
+    return;
+  }
   if (!attached) early.push(line);
 }
 
