@@ -263,11 +263,39 @@ async function deniedFolderIds(
  * drift would show up as a note being deleted off someone's disk. A single
  * predicate swap can't drift.
  */
+/**
+ * A memo for the USER-INDEPENDENT reads inside {@link listDocsInVault}, shared
+ * by several users' computations that answer the SAME event (the vault
+ * channel's per-message ACL refresh, where every connected member recomputes at
+ * once). Only reads whose SQL takes no user id go in it — the vault's whole doc
+ * list, the team's (org) item denies and the org posture — so sharing one can
+ * never hand one person another's answer. Callers must create a fresh memo per
+ * event, AFTER that event arrived: a memo is as fresh as its first read, and
+ * that read started after the change it answers was committed.
+ */
+export type SharedVaultReads = Map<string, Promise<unknown>>;
+
+function shareRead<T>(shared: SharedVaultReads | undefined, key: string, read: () => Promise<T>): Promise<T> {
+  if (!shared) return read();
+  let p = shared.get(key) as Promise<T> | undefined;
+  if (!p) {
+    const fresh = read();
+    p = fresh;
+    shared.set(key, fresh);
+    // A failed read is never handed to a later caller.
+    fresh.catch(() => {
+      if (shared.get(key) === fresh) shared.delete(key);
+    });
+  }
+  return p;
+}
+
 async function listDocsInVault(
   userId: string,
   vaultId: string,
   db: Queryable,
   opts: { deleted: boolean },
+  shared?: SharedVaultReads,
 ): Promise<Set<string>> {
   const access = await vaultAccess(db, userId, vaultId);
   if (!access) return new Set(); // unknown vault
@@ -426,7 +454,10 @@ async function listDocsInVault(
   // "nobody until you name them", and in a vault you set up yourself you wrote
   // nearly everything.
   const userDenied = await deniedDocsInVault(db, "user", userId, vaultId);
-  const orgDenied = await deniedDocsInVault(db, "org", organizationId, vaultId);
+  // Read-only below (never mutated), so a shared instance is safe.
+  const orgDenied = await shareRead(shared, `orgDenied\u0000${organizationId}\u0000${vaultId}`, () =>
+    deniedDocsInVault(db, "org", organizationId, vaultId),
+  );
 
   // A SEALED vault (the Access panel's Private) stops authorship keeping a doc,
   // exactly as an item set Private does — the resolver's posture branch skips
@@ -439,19 +470,26 @@ async function listDocsInVault(
   // A person's own vault level replaces the posture for them, and drops
   // authorship the same way (`view` reaches everything anyway; `denied` is the
   // per-person sealed).
-  const sealed = personal !== null || (await vaultBaseline(db, organizationId)) === "sealed";
+  const sealed =
+    personal !== null ||
+    (await shareRead(shared, `baseline\u0000${organizationId}`, () => vaultBaseline(db, organizationId))) ===
+      "sealed";
 
   let reachable: Set<string>;
   if (vaultWide) {
-    const { rows } = await db.query<{ id: string }>(
-      opts.deleted
-        ? `SELECT id FROM notes WHERE vault_id = $1 AND ${livePredicate}`
-        : `SELECT id FROM notes WHERE vault_id = $1 AND ${livePredicate}
-           UNION
-           SELECT id FROM files WHERE vault_id = $1`,
-      [vaultId],
-    );
-    reachable = new Set(rows.map((r) => r.id));
+    const all = await shareRead(shared, `all\u0000${opts.deleted ? "deleted" : "live"}\u0000${vaultId}`, async () => {
+      const { rows } = await db.query<{ id: string }>(
+        opts.deleted
+          ? `SELECT id FROM notes WHERE vault_id = $1 AND ${livePredicate}`
+          : `SELECT id FROM notes WHERE vault_id = $1 AND ${livePredicate}
+             UNION
+             SELECT id FROM files WHERE vault_id = $1`,
+        [vaultId],
+      );
+      return new Set(rows.map((r) => r.id));
+    });
+    // `reachable` is edited below; the shared set must stay untouched.
+    reachable = new Set(all);
   } else {
     // A personal `denied` drops org item grants too (resolver
     // `personalVaultLevel`): only per-user shares reach the person.
@@ -545,8 +583,9 @@ export async function listReadableDocsInVault(
   userId: string,
   vaultId: string,
   db: Queryable = defaultPool,
+  shared?: SharedVaultReads,
 ): Promise<Set<string>> {
-  return listDocsInVault(userId, vaultId, db, { deleted: false });
+  return listDocsInVault(userId, vaultId, db, { deleted: false }, shared);
 }
 
 /**
