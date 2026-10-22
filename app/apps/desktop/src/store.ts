@@ -14,7 +14,7 @@ import {
   readItemColors,
   writeItemColors,
 } from "./lib/appearance";
-import { effectiveLockForPath, lockScopesByPath } from "./lib/locks";
+import { lockBlocksCaller, lockScopesByPath } from "./lib/locks";
 import { readItemOrder, renameInOrder, writeItemOrder, type ItemOrder } from "./lib/ordering";
 import { loadedFolderPaths, mergeChildren, nodeAt, setChildrenAt } from "./lib/tree/lazyTree";
 import { applyTitlePatch } from "./lib/tree/titles";
@@ -3100,7 +3100,7 @@ export const useStore = create<AppStore>((set, get) => ({
       const lifts = overlay.filter((s) => s.permission === "edit");
       const state = get();
       const map = lockScopesByPath(state.tree, locks, state.session?.user.id, lifts);
-      return (relPath) => effectiveLockForPath(map, relPath) != null;
+      return (relPath) => lockBlocksCaller(map, relPath);
     });
     syncManager.setSyncPauseListener((pause) => set({ syncPause: pause }));
     syncManager.setVaultStatusListener((status) => {

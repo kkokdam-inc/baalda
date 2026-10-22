@@ -162,6 +162,18 @@ export function lockScopesByPath(
 }
 
 /**
+ * Whether a path is read-only FOR THE CALLER: an Everyone lock, the vault
+ * posture, or the caller's own row. Another member's row (the `member` scope,
+ * which owners/admins see so they can Unlock a legacy lock) is a badge only;
+ * it never makes the caller's own editor read-only. `member` ranks lowest, so
+ * the effective scope is `member` only when nothing else applies.
+ */
+export function lockBlocksCaller(map: LockScopeMap, path: string): boolean {
+  const scope = effectiveLockForPath(map, path);
+  return scope !== null && scope !== "member";
+}
+
+/**
  * Effective lock on a path, including locks inherited from ancestor folders
  * (folder locks apply to everything inside).
  *

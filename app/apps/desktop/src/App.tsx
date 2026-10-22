@@ -77,7 +77,7 @@ import { isSilentRelease, notesForVersion, releaseNoteLines } from "./lib/releas
 import { runConfetti } from "./lib/celebrate/celebrate";
 import { viewerFor } from "./lib/formats";
 import { effectiveHomeNote, homeSidebarVisitKey } from "./lib/pins";
-import { effectiveLockForPath, lockScopesByPath } from "./lib/locks";
+import { lockBlocksCaller, lockScopesByPath } from "./lib/locks";
 import { onOpenFileRequest } from "./lib/openFileRequest";
 import { editorMeasureStyle } from "./lib/editorMeasure";
 import { noteLabel } from "./lib/notePath";
@@ -1114,7 +1114,7 @@ export default function App() {
     const home = effectiveHomeNote(s);
     if (!home || s.activeVirtualTab || s.openNote?.path !== home.path) return null;
     if (["read-only", "no-access", "deleted"].includes(String(s.docSyncState[home.id]))) return null;
-    return effectiveLockForPath(lockScopesByPath(s.tree, s.locks, s.session?.user.id, s.lifts), home.path) ? null : home.path;
+    return lockBlocksCaller(lockScopesByPath(s.tree, s.locks, s.session?.user.id, s.lifts), home.path) ? null : home.path;
   });
   // Home opens normally unless its sidebar navigation action explicitly requests full width.
   const currentHomePath = useStore((s) => {

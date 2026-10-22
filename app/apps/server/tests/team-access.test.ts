@@ -1028,6 +1028,40 @@ describe("team-access — the vault posture in the lock overlay", () => {
     expect(liftRows(await locks(other))).toHaveLength(0);
   });
 
+  it("never reports another member's per-user Can view / No access rows", async () => {
+    const insert = (resourceId: string, userId: string, permission: string) =>
+      pool.query(
+        `INSERT INTO shares (id, org_id, resource_type, resource_id, principal_type, principal_id, permission)
+         VALUES ($1, $2, 'folder', $3, 'user', $4, $5)`,
+        [randomUUID(), orgId, resourceId, userId, permission],
+      );
+    const sub = await seedFolder(vault, folder, "Sub", "Docs/Sub");
+    await insert(folder, other.userId, "readonly");
+    await insert(sub, other.userId, "denied");
+    await insert(folder, member.userId, "readonly");
+    await seedLock(orgId, "file", note, { type: "user", id: other.userId });
+    await seedLock(orgId, "folder", folder, { type: "org" });
+
+    // A plain member sees the Everyone lock and their own row, nothing of the other member's.
+    const mine = await locks(member);
+    expect(mine.some((r) => r.principal_type === "user" && r.principal_id !== member.userId)).toBe(false);
+    expect(mine).toContainEqual(expect.objectContaining({ resource_id: folder, principal_id: member.userId }));
+    expect(mine).toContainEqual(expect.objectContaining({ resource_id: folder, principal_type: "org", permission: "locked" }));
+
+    // The other member sees their own three rows.
+    const theirs = (await locks(other)).filter((r) => r.principal_type === "user");
+    expect(theirs.every((r) => r.principal_id === other.userId)).toBe(true);
+    expect(theirs).toHaveLength(3);
+
+    // An owner sees another member's legacy `locked` row (for Unlock), but not
+    // their Can view or No access rows.
+    const owners = (await locks(owner)).filter(
+      (r) => r.principal_type === "user" && r.principal_id !== owner.userId,
+    );
+    expect(owners).toHaveLength(1);
+    expect(owners[0]).toMatchObject({ resource_id: note, principal_id: other.userId, permission: "locked" });
+  });
+
   it("does not report a view grant or the vault grant itself as a lift", async () => {
     await put(owner, `/api/orgs/${orgId}/team-access`, { mode: "readonly" });
     await seedOrgGrant(orgId, "file", note, "view");

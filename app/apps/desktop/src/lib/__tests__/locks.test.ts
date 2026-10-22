@@ -27,6 +27,7 @@ import {
   hasVaultLock,
   itemLockRows,
   LOCK_TITLES,
+  lockBlocksCaller,
   lockScopesByPath,
 } from "../locks";
 
@@ -354,6 +355,34 @@ describe("effectiveLockForPath", () => {
     );
     expect(effectiveLockForPath(map, "Projects/Deep/buried.md")).toBe("you");
     expect(effectiveLockForPath(map, "Projects/alpha.md")).toBeNull();
+  });
+});
+
+describe("lockBlocksCaller", () => {
+  const userRow = (resourceId: string, userId: string) =>
+    share({ id: `u-${resourceId}-${userId}`, resourceType: "folder", resourceId, principalType: "user", principalId: userId });
+
+  it("never makes the caller read-only on another member's row (badge only)", () => {
+    const map = lockScopesByPath(tree, [userRow("f-projects", "u2")], "u1");
+    expect(effectiveLockForPath(map, "Projects/alpha.md")).toBe("member");
+    expect(lockBlocksCaller(map, "Projects/alpha.md")).toBe(false);
+    expect(lockBlocksCaller(map, "Projects/Deep/buried.md")).toBe(false);
+  });
+
+  it("blocks on the caller's own row, an Everyone lock and the vault posture", () => {
+    expect(lockBlocksCaller(lockScopesByPath(tree, [userRow("f-projects", "u1")], "u1"), "Projects/alpha.md")).toBe(true);
+    expect(
+      lockBlocksCaller(
+        lockScopesByPath(tree, [share({ resourceType: "folder", resourceId: "f-projects" })], "u1"),
+        "Projects/alpha.md",
+      ),
+    ).toBe(true);
+    expect(lockBlocksCaller(lockScopesByPath(tree, [vaultLock()], "u1"), "loose.md")).toBe(true);
+  });
+
+  it("still blocks when the caller's own lock sits above another member's", () => {
+    const map = lockScopesByPath(tree, [userRow("f-projects", "u1"), userRow("f-deep", "u2")], "u1");
+    expect(lockBlocksCaller(map, "Projects/Deep/buried.md")).toBe(true);
   });
 });
 

@@ -18,7 +18,7 @@ import { bindActiveNote } from "../lib/editor/activeNoteBinding";
 import { saveAttachment } from "../lib/attachments";
 import { bridgeManager, type NoteBridge } from "../lib/bridge";
 import { editorMeasureStyle } from "../lib/editorMeasure";
-import { effectiveLockForPath, hasBillingLapsedLock, lockScopesByPath } from "../lib/locks";
+import { hasBillingLapsedLock, lockBlocksCaller, lockScopesByPath } from "../lib/locks";
 import { playPingSound } from "../lib/presence/ping";
 import { syncManager } from "../lib/sync/docSession";
 import { colorForUser, PRESENCE_OFFLINE, statusTone, ringShowsColor } from "../lib/presence/color";
@@ -519,10 +519,10 @@ export function Editor() {
       const st = useStore.getState();
       const lockedLocally =
         syncEnabled &&
-        effectiveLockForPath(
+        lockBlocksCaller(
           lockScopesByPath(st.tree, st.locks, st.session?.user.id, st.lifts),
           notePath,
-        ) != null;
+        );
       const ro = opened.readOnly || opened.status === "no-access" || lockedLocally;
       setReadOnly(ro);
       const editable = new Compartment();
