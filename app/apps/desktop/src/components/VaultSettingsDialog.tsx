@@ -1979,6 +1979,11 @@ function McpTab() {
   const snippet = justCreated
     ? `claude mcp add --transport http context ${mcpUrl} \\\n  --header "Authorization: Bearer ${justCreated.token}"`
     : "";
+  // Codex reads the bearer token from an environment variable, so the token
+  // goes in the shell profile and only the variable's name in config.toml.
+  const codexSnippet = justCreated
+    ? `# In your shell profile\nexport CONTEXT_MCP_TOKEN="${justCreated.token}"\n\n# In ~/.codex/config.toml\n[mcp_servers.context]\nurl = "${mcpUrl}"\nbearer_token_env_var = "CONTEXT_MCP_TOKEN"`
+    : "";
 
   return (
     <>
@@ -2042,6 +2047,13 @@ function McpTab() {
             <code className="mcp-snippet">{snippet}</code>
             <button className="link-btn" onClick={() => void copy(snippet, "snippet")}>
               {copied === "snippet" ? "Copied ✓" : "Copy"}
+            </button>
+          </div>
+          <div className="muted">Or add it to Codex:</div>
+          <div className="join-code-row">
+            <code className="mcp-snippet">{codexSnippet}</code>
+            <button className="link-btn" onClick={() => void copy(codexSnippet, "codex")}>
+              {copied === "codex" ? "Copied ✓" : "Copy"}
             </button>
           </div>
           <button className="link-btn" onClick={() => setJustCreated(null)}>

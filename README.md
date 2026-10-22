@@ -219,6 +219,19 @@ claude mcp add --transport http context http://localhost:3010/api/mcp \
   --header "Authorization: Bearer mcp_…"
 ```
 
+Or Codex: put the token in an environment variable (e.g. in your shell profile) and
+add the server to `~/.codex/config.toml`:
+
+```bash
+export CONTEXT_MCP_TOKEN="mcp_…"
+```
+
+```toml
+[mcp_servers.context]
+url = "http://localhost:3010/api/mcp"
+bearer_token_env_var = "CONTEXT_MCP_TOKEN"
+```
+
 (On the managed service the endpoint is `https://api.baalda.com/api/mcp`; for a
 self-hosted server, use your server URL plus `/api/mcp`.)
 
