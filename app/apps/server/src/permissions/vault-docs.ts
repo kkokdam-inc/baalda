@@ -138,7 +138,7 @@ const USER_DECISION_CTE = `
      UNION ALL
      SELECT f.id, COALESCE(u.permission, d.perm)
        FROM folders f
-       JOIN dec d ON f.parent_id = d.id
+       JOIN dec d ON f.parent_id = d.id AND f.vault_id = $2
        LEFT JOIN user_rows u ON u.resource_type = 'folder' AND u.resource_id = f.id
   )`;
 
@@ -183,9 +183,9 @@ async function deniedDocsInVault(
            AND principal_type = $3 AND principal_id = $1
      ),
      denied_subtree AS (
-        SELECT id, parent_id FROM folders WHERE id IN (SELECT id FROM denied_seed)
+        SELECT id, parent_id FROM folders WHERE vault_id = $2 AND id IN (SELECT id FROM denied_seed)
         UNION
-        SELECT f.id, f.parent_id FROM folders f JOIN denied_subtree d ON f.parent_id = d.id
+        SELECT f.id, f.parent_id FROM folders f JOIN denied_subtree d ON f.parent_id = d.id AND f.vault_id = $2
      ),
      denied_files AS (
         SELECT resource_id AS id FROM shares
@@ -405,9 +405,9 @@ async function listDocsInVault(
              )
        ),
        subtree AS (
-          SELECT id FROM folders WHERE id IN (SELECT id FROM shared_folders)
+          SELECT id FROM folders WHERE vault_id = $2 AND id IN (SELECT id FROM shared_folders)
           UNION
-          SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id
+          SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id AND f.vault_id = $2
        ),
        shared_files AS (
           SELECT resource_id AS id FROM shares
@@ -525,9 +525,9 @@ async function listDocsInVault(
                 OR (principal_type = 'org' AND principal_id = $3
                     AND access_revision > $4))
          ), subtree AS (
-           SELECT id FROM folders WHERE id IN (SELECT id FROM allowed_folders)
+           SELECT id FROM folders WHERE vault_id = $2 AND id IN (SELECT id FROM allowed_folders)
            UNION
-           SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id
+           SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id AND f.vault_id = $2
          ), allowed_files AS (
            SELECT resource_id AS id FROM shares
             WHERE resource_type = 'file'
@@ -678,7 +678,7 @@ export async function listVisibleFolders(
               AND s.principal_type = 'user' AND s.principal_id = $1
               AND s.permission IN ('view', 'edit', 'readonly')
            UNION
-           SELECT f.id FROM folders f JOIN granted g ON f.parent_id = g.id
+           SELECT f.id FROM folders f JOIN granted g ON f.parent_id = g.id AND f.vault_id = $2
          ) SELECT id FROM granted`,
         [userId, vaultId],
       );
@@ -754,7 +754,7 @@ export async function listVisibleFolders(
      down AS (
         SELECT id, parent_id FROM folders WHERE vault_id = $2 AND id IN (SELECT id FROM seed)
         UNION
-        SELECT f.id, f.parent_id FROM folders f JOIN down d ON f.parent_id = d.id
+        SELECT f.id, f.parent_id FROM folders f JOIN down d ON f.parent_id = d.id AND f.vault_id = $2
      ),
      note_folders AS (
         SELECT DISTINCT folder_id AS id FROM notes
@@ -766,7 +766,7 @@ export async function listVisibleFolders(
          WHERE vault_id = $2
            AND id IN (SELECT id FROM down UNION SELECT id FROM note_folders)
         UNION
-        SELECT f.id, f.parent_id FROM folders f JOIN up u ON f.id = u.parent_id
+        SELECT f.id, f.parent_id FROM folders f JOIN up u ON f.id = u.parent_id AND f.vault_id = $2
      )
      SELECT DISTINCT id FROM up`,
     [userId, vaultId, access.organizationId, isMember, [...readable], authorSeeds],
@@ -785,7 +785,7 @@ export async function listVisibleFolders(
          SELECT id, parent_id FROM folders
           WHERE vault_id = $2 AND id IN (SELECT id FROM granted)
          UNION
-         SELECT f.id, f.parent_id FROM folders f JOIN down d ON f.parent_id = d.id
+         SELECT f.id, f.parent_id FROM folders f JOIN down d ON f.parent_id = d.id AND f.vault_id = $2
        ), note_folders AS (
          SELECT DISTINCT folder_id AS id FROM notes
           WHERE vault_id = $2 AND deleted_at IS NULL AND folder_id IS NOT NULL
@@ -798,7 +798,7 @@ export async function listVisibleFolders(
           WHERE vault_id = $2
             AND id IN (SELECT id FROM down UNION SELECT id FROM note_folders)
          UNION
-         SELECT f.id, f.parent_id FROM folders f JOIN up u ON f.id = u.parent_id
+         SELECT f.id, f.parent_id FROM folders f JOIN up u ON f.id = u.parent_id AND f.vault_id = $2
        )
        SELECT id FROM up`,
       [userId, vaultId, access.organizationId, snapshot.accessRevision, [...readable]],
