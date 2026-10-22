@@ -89,6 +89,63 @@ describe("binary Yjs persistence + compaction (spec 02 §5A / 03 §3)", () => {
     expect(rebuilt.getText("content").toString()).toBe("y".repeat(15));
   });
 
+  it("compacts on exactly the append that crosses the threshold, without counting every write", async () => {
+    const threshold = 10;
+    const docId = `doc-threshold-${Math.random().toString(36).slice(2)}`;
+    const doc = new Y.Doc();
+    const text = doc.getText("content");
+    const seq: Uint8Array[] = [];
+    doc.on("update", (u) => seq.push(u));
+    for (let i = 0; i < 12; i++) text.insert(text.length, "z");
+    doc.destroy();
+
+    let counts = 0;
+    const counting: Queryable = {
+      query: ((sql: string, params?: unknown[]) => {
+        if (typeof sql === "string" && sql.includes("count(*)")) counts++;
+        return pool.query(sql, params as unknown[]);
+      }) as Queryable["query"],
+    };
+    const compactedAt: number[] = [];
+    for (let i = 0; i < seq.length; i++) {
+      const r = await appendUpdate(docId, seq[i], counting, threshold);
+      if (r.compacted) compactedAt.push(i + 1);
+    }
+    // Same trigger as a count on every write: the 11th row (> 10) compacts.
+    expect(compactedAt).toEqual([11]);
+    // ...but far fewer counts than the 12 writes.
+    expect(counts).toBeLessThan(seq.length);
+    const rebuilt = new Y.Doc();
+    Y.applyUpdate(rebuilt, (await loadDocState(docId))!);
+    expect(rebuilt.getText("content").toString()).toBe("z".repeat(12));
+  });
+
+  it("still compacts when rows arrive from outside this process (another instance)", async () => {
+    const threshold = 10;
+    const docId = `doc-foreign-${Math.random().toString(36).slice(2)}`;
+    const doc = new Y.Doc();
+    const text = doc.getText("content");
+    const seq: Uint8Array[] = [];
+    doc.on("update", (u) => seq.push(u));
+    for (let i = 0; i < 40; i++) text.insert(text.length, "w");
+    doc.destroy();
+
+    // Seed this process's estimate with one append, then let "another
+    // instance" write 15 rows straight to the table.
+    await appendUpdate(docId, seq[0], pool, threshold);
+    for (let i = 1; i <= 15; i++) {
+      await pool.query("INSERT INTO doc_updates (doc_id, update) VALUES ($1, $2)", [
+        docId,
+        Buffer.from(seq[i]),
+      ]);
+    }
+    let compacted = false;
+    for (let i = 16; i < 24 && !compacted; i++) {
+      compacted = (await appendUpdate(docId, seq[i], pool, threshold)).compacted;
+    }
+    expect(compacted).toBe(true);
+  });
+
   it("explicit compact() is idempotent and preserves state", async () => {
     const doc = new Y.Doc();
     const text = doc.getText("content");
