@@ -14,6 +14,7 @@ import { EditorView, layer, ViewPlugin, type LayerMarker } from "@codemirror/vie
 import type { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
 import { insideFold } from "./folding";
+import { visibleBodyPos } from "./livePreview";
 
 /** Dispatched to nudge the layer into recomputing when awareness changes. */
 const remoteCursorsSync = Annotation.define<boolean>();
@@ -60,7 +61,14 @@ function readCursors(view: EditorView, ytext: Y.Text, awareness: Awareness): Rem
     // hidden peer's flag on top of the same `…` pill. Theirs is not our fold to
     // open, so the honest thing is to draw nothing.
     if (insideFold(view.state, abs.index)) return;
-    const pos = view.coordsAtPos(abs.index);
+    // A caret on what OUR header hides (the duplicate first H1, a Properties
+    // panel's YAML) has no line here either, and `coordsAtPos` answers with the
+    // replaced block's edge: the flag floated at the pane's far left, between
+    // the title and the body. A new peer's caret starts at 0, exactly there, so
+    // draw it at the first visible body position instead; presence still shows.
+    const index = visibleBodyPos(view.state, abs.index);
+    if (index == null) return;
+    const pos = view.coordsAtPos(index);
     if (!pos) return; // off-screen (outside the rendered viewport) — skip
     const top = pos.top - base.top;
     const user = state.user ?? {};
