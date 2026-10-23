@@ -172,11 +172,11 @@ jobs:
           - platform: 'windows-latest'
             args: ''
           # ── What "signed" means per platform ─────────────────────────────────
-          # macOS is the only one with real OS signing (Developer ID + notarized
-          # + stapled). Linux and Windows ship UNSIGNED, so a fresh download
-          # warns: Windows SmartScreen shows "unrecognized app" (More info → Run
-          # anyway) and Linux has no signing story to speak of. Fixing Windows
-          # means an Authenticode/EV cert in WINDOWS_CERTIFICATE — not wired up.
+          # macOS: Developer ID + notarized + stapled. Windows: Authenticode via
+          # Azure Artifact Signing (.github/actions/windows-signing) once the six
+          # AZURE_* signing secrets are set; until then it ships unsigned with a
+          # warning annotation, and SmartScreen says "unrecognized app" (More
+          # info → Run anyway). Linux has no signing story to speak of.
           #
           # Auto-update is unaffected on every platform: the updater verifies our
           # minisign signature over the bundle, not any OS certificate.
@@ -320,6 +320,21 @@ jobs:
             echo 'RELNOTES_EOF'
           } >> "$GITHUB_OUTPUT"
 
+      # Writes the signCommand overlay (or nothing, while the secrets are unset).
+      # Its output is appended to `args` below; empty on every other platform.
+      - name: Prepare Windows signing
+        id: winsign
+        if: matrix.platform == 'windows-latest'
+        uses: ./.github/actions/windows-signing
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          account: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          profile: ${{ secrets.AZURE_SIGNING_PROFILE }}
+          description: Baalda
+
       # Two steps rather than one with conditional env, deliberately. Blanking
       # APPLE_ID/PASSWORD/TEAM_ID does not reliably disable notarization — a GitHub
       # expression yields an EMPTY STRING, not an unset variable, and "set but
@@ -345,6 +360,11 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Azure Artifact Signing credentials, read by the signCommand's dlib
+          # (EnvironmentCredential). Windows only; empty elsewhere.
+          AZURE_CLIENT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_TENANT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_TENANT_ID || '' }}
         with:
           projectPath: app/apps/desktop
           tagName: v__VERSION__
@@ -352,7 +372,7 @@ jobs:
           releaseBody: ${{ steps.relnotes.outputs.body }}
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} ${{ steps.winsign.outputs.config_arg }}
 
       # Same build, minus the three notarization variables. Tauri logs
       # "skipping app notarization, no APPLE_ID & APPLE_PASSWORD & APPLE_TEAM_ID"
@@ -370,6 +390,9 @@ jobs:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          AZURE_CLIENT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_TENANT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_TENANT_ID || '' }}
         with:
           projectPath: app/apps/desktop
           tagName: v__VERSION__
@@ -377,4 +400,9 @@ jobs:
           releaseBody: ${{ steps.relnotes.outputs.body }}
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} ${{ steps.winsign.outputs.config_arg }}
+
+      - name: Verify Windows signatures
+        if: matrix.platform == 'windows-latest' && steps.winsign.outputs.config_arg != ''
+        shell: pwsh
+        run: ./.github/scripts/verify-windows-signatures.ps1

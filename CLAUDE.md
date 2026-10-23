@@ -18,9 +18,11 @@ Three pieces; this open-source repo holds the first two.
   `.github/workflows/release.yml`'s `gate` job releases only when that version changed
   (a `v*` tag still forces one). It builds installers for **macOS (arm64 + x64),
   Linux x64 and Windows x64**, and **publishes** a GitHub Release with `latest.json`.
-  Only macOS is OS-signed (Developer ID + notarized + stapled); Linux/Windows ship
-  unsigned, so fresh downloads warn (SmartScreen) — auto-update is unaffected everywhere
-  because the updater checks our minisign signature, not an OS certificate.
+  macOS is OS-signed (Developer ID + notarized + stapled); Windows is Authenticode-signed
+  through Azure Artifact Signing (`.github/actions/windows-signing`) once the six `AZURE_*`
+  signing secrets are set, and ships unsigned with a warning annotation until then; Linux
+  ships unsigned — auto-update is unaffected everywhere because the updater checks our
+  minisign signature, not an OS certificate.
   There is no draft/review gate — pushing a `v*` tag ships to every running app on its next
   updater poll (Tauri updater polls `releases/latest`).
   The server deploys in minutes but the release's four serial platform jobs publish `latest.json`

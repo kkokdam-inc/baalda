@@ -99,12 +99,13 @@ submission already paid for in wall-clock.
 | macOS arm64 | `macos-latest` | `.dmg`, `.app.tar.gz` | Developer ID + notarized + stapled |
 | macOS x64 | `macos-latest` | `.dmg`, `.app.tar.gz` | Developer ID + notarized + stapled |
 | Linux x64 | `ubuntu-22.04` | `.AppImage`, `.deb`, `.rpm` | **none** |
-| Windows x64 | `windows-latest` | `.exe` (NSIS), `.msi` | **none** |
+| Windows x64 | `windows-latest` | `.exe` (NSIS), `.msi` | Authenticode via Azure Artifact Signing (once the secrets are set) |
 
-**Only macOS is OS-signed.** Windows downloads trip SmartScreen's "unrecognized
-app" warning (More info → Run anyway) until an Authenticode/EV certificate is
-wired into `WINDOWS_CERTIFICATE`; Linux has no signing story to wire up. That
-affects *fresh downloads only* — **auto-update is unaffected on every platform**,
+**macOS and Windows are OS-signed; Linux is not.** Windows signing turns on when
+the `AZURE_*` signing secrets exist (see [Windows code signing](#windows-code-signing));
+until then Windows downloads trip SmartScreen's "unrecognized app" warning (More
+info → Run anyway). Linux has no signing story to wire up. Signing affects *fresh
+downloads only* — **auto-update is unaffected on every platform**,
 because the updater verifies our minisign signature over the bundle rather than
 any OS certificate.
 
@@ -598,16 +599,45 @@ JIT/executable-memory keys the WKWebView needs under the hardened runtime. The a
 is intentionally **not** sandboxed — it reads and writes the user's vault anywhere
 on disk.
 
-## Windows code signing (optional)
+## Windows code signing
 
-> Windows x64 is built on `windows-latest` in the release matrix and ships
-> **unsigned** (see the platform table above). Signing is optional future work.
+Windows binaries are Authenticode-signed with **Azure Artifact Signing**
+(Microsoft's managed signing service, about $10/month for 5,000 signatures). Both
+`release.yml` and `staging-release.yml` call `.github/actions/windows-signing`,
+which installs Microsoft's signing dlib (pinned by version and sha256), finds the
+runner's newest `signtool`, and writes a `bundle.windows.signCommand` overlay
+(`src-tauri/tauri.windows-sign.build.conf.json`, generated, gitignored). Tauri then
+signs the app exe, the NSIS installer and uninstaller, and the MSI before it
+creates the minisign updater signature, so auto-update is unchanged. A signing
+error fails `tauri build` before anything is uploaded; a `Verify Windows
+signatures` step afterwards checks every installer is validly signed.
 
-Unsigned Windows installers still run but show a SmartScreen
-*"Windows protected your PC"* warning on a fresh download (auto-update is
-unaffected: the updater checks our minisign signature). To remove the warning,
-obtain an OV/EV code-signing certificate and add Tauri's Windows signing config;
-this is optional and can be deferred.
+Signing stays **off** until all six secrets exist: with none set the Windows job
+builds unsigned and leaves a warning annotation; with only some set it fails.
+
+| Actions secret | Value |
+| --- | --- |
+| `AZURE_TENANT_ID` | Entra tenant of the subscription |
+| `AZURE_CLIENT_ID` | App registration (service principal) with the **Artifact Signing Certificate Profile Signer** role on the certificate profile |
+| `AZURE_CLIENT_SECRET` | A client secret of that app registration (rotate before it expires) |
+| `AZURE_SIGNING_ENDPOINT` | The account's regional endpoint, e.g. `https://weu.codesigning.azure.net`; it must match the account's region |
+| `AZURE_SIGNING_ACCOUNT` | Artifact Signing account name |
+| `AZURE_SIGNING_PROFILE` | Public Trust certificate profile name |
+
+One-time Azure setup (portal): register the `Microsoft.CodeSigning` resource
+provider on the subscription, create an Artifact Signing account (Basic tier),
+complete a **Public** organization identity validation (portal only; the
+requester needs the Identity Verifier role; 1 to 20 business days), create a
+**Public Trust** certificate profile on that validation, then create the app
+registration and give it the signer role on the profile.
+
+Signed builds show the verified publisher immediately. SmartScreen's "Windows
+protected your PC" screen can still appear for a while, until the signed builds
+earn download reputation; the README's "More info → Run anyway" note stays until
+it stops. Artifact Signing certificates are short-lived (days) and renewed
+automatically, which is why every signature is timestamped
+(`timestamp.acs.microsoft.com`); a timestamped signature stays valid after its
+certificate expires.
 
 ## Linux
 

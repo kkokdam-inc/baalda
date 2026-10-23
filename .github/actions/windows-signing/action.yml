@@ -1,0 +1,173 @@
+name: Windows signing setup
+description: >
+  Prepares Azure Artifact Signing for a Tauri Windows build and writes a config
+  overlay whose bundle.windows.signCommand signs every binary Tauri produces.
+  Off (empty output, one warning) until the six Azure secrets are set.
+
+# Why our own step and not artifact-signing-cli (the tool Tauri's docs suggest):
+# that is a single-maintainer crate that would receive our Azure credentials, and
+# it runs `az login` with inherited stdout, printing subscription details into
+# this public repo's Actions logs. Microsoft's own pieces do the same job: the
+# signing dlib from NuGet (pinned by version AND sha256 below) plugged into
+# signtool, authenticating through DefaultAzureCredential's EnvironmentCredential
+# from AZURE_CLIENT_ID / AZURE_CLIENT_SECRET / AZURE_TENANT_ID. Those three must
+# therefore be in the env of the tauri-action step that runs the sign command.
+#
+# Fail-closed by construction: once the overlay is applied, a signing error is a
+# non-zero signCommand, which fails `tauri build` before tauri-action uploads.
+
+inputs:
+  client-id:
+    description: AZURE_CLIENT_ID of the app registration holding the Certificate Profile Signer role
+    required: false
+  client-secret:
+    description: AZURE_CLIENT_SECRET of that app registration
+    required: false
+  tenant-id:
+    description: AZURE_TENANT_ID
+    required: false
+  endpoint:
+    description: Regional endpoint of the Artifact Signing account, e.g. https://weu.codesigning.azure.net
+    required: false
+  account:
+    description: Artifact Signing account name
+    required: false
+  profile:
+    description: Certificate profile name
+    required: false
+  description:
+    description: Signed-content description (shown as the installer name in an MSI's UAC prompt)
+    required: true
+
+outputs:
+  config_arg:
+    description: '`--config <overlay>` to append to tauri-action args, or empty when signing is off'
+    value: ${{ steps.overlay.outputs.config_arg }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check signing secrets
+      id: check
+      shell: pwsh
+      env:
+        CLIENT_ID: ${{ inputs.client-id }}
+        CLIENT_SECRET: ${{ inputs.client-secret }}
+        TENANT_ID: ${{ inputs.tenant-id }}
+        ENDPOINT: ${{ inputs.endpoint }}
+        ACCOUNT: ${{ inputs.account }}
+        PROFILE_NAME: ${{ inputs.profile }}
+      run: |
+        $names = 'CLIENT_ID','CLIENT_SECRET','TENANT_ID','ENDPOINT','ACCOUNT','PROFILE_NAME'
+        $set = @($names | Where-Object { [Environment]::GetEnvironmentVariable($_) })
+        if ($set.Count -eq 0) {
+          Write-Output "::warning title=Windows build is unsigned::Azure Artifact Signing secrets are not set, so SmartScreen will warn on fresh downloads. See docs/RELEASE.md -> Windows code signing."
+          "enabled=false" >> $env:GITHUB_OUTPUT
+          exit 0
+        }
+        if ($set.Count -ne $names.Count) {
+          $missing = $names | Where-Object { $set -notcontains $_ }
+          Write-Output "::error title=Windows signing half-configured::Missing: $($missing -join ', '). Set all six AZURE_* signing secrets or none."
+          exit 1
+        }
+        "enabled=true" >> $env:GITHUB_OUTPUT
+
+    # The dlib needs the .NET 8 runtime; the runner image's set of runtimes moves
+    # under us, so install it rather than assume it.
+    - name: Setup .NET 8
+      if: steps.check.outputs.enabled == 'true'
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Install the Artifact Signing dlib
+      if: steps.check.outputs.enabled == 'true'
+      id: dlib
+      shell: pwsh
+      env:
+        # NuGet packages are immutable, so the hash pins the exact bytes. To bump:
+        # download the new .nupkg, `Get-FileHash -Algorithm SHA256`, update both.
+        DLIB_VERSION: '1.0.146'
+        DLIB_SHA256: '7761e5d8f31e54b764da21d33cd8b0a2940e1b05526c7dfcb5e94b0431426f70'
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $dir = Join-Path $env:RUNNER_TEMP 'artifact-signing'
+        $pkg = Join-Path $env:RUNNER_TEMP "artifact-signing-$env:DLIB_VERSION.zip"
+        Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.ArtifactSigning.Client/$env:DLIB_VERSION" -OutFile $pkg
+        $hash = (Get-FileHash -Algorithm SHA256 $pkg).Hash.ToLower()
+        if ($hash -ne $env:DLIB_SHA256) { throw "Artifact Signing dlib sha256 mismatch: $hash" }
+        Expand-Archive -Path $pkg -DestinationPath $dir -Force
+        $dll = Join-Path $dir 'bin\x64\Azure.CodeSigning.Dlib.dll'
+        if (-not (Test-Path $dll)) { throw "Azure.CodeSigning.Dlib.dll not found in the package" }
+        "dll=$dll" >> $env:GITHUB_OUTPUT
+
+    # Artifact Signing needs signtool >= 10.0.22621 (the 20348 SDK is refused by
+    # the dlib). Take the newest one the image has rather than hard-coding a path.
+    - name: Locate signtool
+      if: steps.check.outputs.enabled == 'true'
+      id: signtool
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $tool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\signtool.exe' |
+          Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+          Select-Object -First 1
+        if (-not $tool) { throw 'signtool.exe not found on this runner' }
+        $ver = [version]$tool.Directory.Parent.Name
+        if ($ver.Build -lt 22621) { throw "signtool $ver is too old for Artifact Signing (need 10.0.22621+)" }
+        Write-Output "Using signtool $ver"
+        "path=$($tool.FullName)" >> $env:GITHUB_OUTPUT
+
+    # Object form of signCommand, because every path here contains spaces and the
+    # string form splits on ' '. Tauri replaces "%1" with each file it signs: the
+    # app exe, the NSIS installer and uninstaller, and the MSI.
+    - name: Write metadata and the signing overlay
+      id: overlay
+      shell: pwsh
+      env:
+        ENABLED: ${{ steps.check.outputs.enabled }}
+        ENDPOINT: ${{ inputs.endpoint }}
+        ACCOUNT: ${{ inputs.account }}
+        PROFILE_NAME: ${{ inputs.profile }}
+        DLL: ${{ steps.dlib.outputs.dll }}
+        SIGNTOOL: ${{ steps.signtool.outputs.path }}
+        DESCRIPTION: ${{ inputs.description }}
+        CORRELATION: ${{ github.repository }}@${{ github.run_id }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        if ($env:ENABLED -ne 'true') { "config_arg=" >> $env:GITHUB_OUTPUT; exit 0 }
+        $metadata = Join-Path $env:RUNNER_TEMP 'artifact-signing-metadata.json'
+        # EnvironmentCredential only: skipping the other DefaultAzureCredential
+        # probes avoids a managed-identity timeout on every file signed.
+        @{
+          Endpoint               = $env:ENDPOINT
+          CodeSigningAccountName = $env:ACCOUNT
+          CertificateProfileName = $env:PROFILE_NAME
+          CorrelationId          = $env:CORRELATION
+          ExcludeCredentials     = @(
+            'ManagedIdentityCredential', 'WorkloadIdentityCredential',
+            'SharedTokenCacheCredential', 'VisualStudioCredential',
+            'VisualStudioCodeCredential', 'AzureCliCredential',
+            'AzurePowerShellCredential', 'AzureDeveloperCliCredential',
+            'InteractiveBrowserCredential'
+          )
+        } | ConvertTo-Json | Set-Content -Encoding utf8 $metadata
+        # Relative to tauri-action's projectPath, like the staging overlays.
+        $rel = 'src-tauri/tauri.windows-sign.build.conf.json'
+        @{
+          bundle = @{
+            windows = @{
+              signCommand = @{
+                cmd  = $env:SIGNTOOL
+                args = @(
+                  'sign', '/v', '/fd', 'SHA256',
+                  '/tr', 'http://timestamp.acs.microsoft.com', '/td', 'SHA256',
+                  '/dlib', $env:DLL, '/dmdf', $metadata,
+                  '/d', $env:DESCRIPTION,
+                  '%1'
+                )
+              }
+            }
+          }
+        } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path 'app/apps/desktop' $rel)
+        "config_arg=--config $rel" >> $env:GITHUB_OUTPUT

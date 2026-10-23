@@ -273,10 +273,11 @@ jobs:
           # cannot contain the `-` our staging version has.
           #
           # Signing is production's, byte for byte: macOS gets Developer ID +
-          # notarized + stapled so a tester's install is clean; Linux and Windows
-          # ship unsigned and warn on a fresh download (SmartScreen). Auto-update
-          # is unaffected everywhere — the updater checks our minisign signature,
-          # not an OS certificate.
+          # notarized + stapled so a tester's install is clean; Windows is signed
+          # through Azure Artifact Signing once the AZURE_* secrets are set (so
+          # staging rehearses production's signing); Linux ships unsigned.
+          # Auto-update is unaffected everywhere — the updater checks our
+          # minisign signature, not an OS certificate.
           #
           # Linux is pinned to ubuntu-22.04 for release.yml's glibc reason.
           # ⚠️ GitHub begins deprecating that image 2026-09-17 and removes it
@@ -510,6 +511,21 @@ jobs:
             echo 'RELNOTES_EOF'
           } >> "$GITHUB_OUTPUT"
 
+      # Writes the signCommand overlay (or nothing, while the secrets are unset),
+      # exactly as release.yml does. Empty output on every other platform.
+      - name: Prepare Windows signing
+        id: winsign
+        if: matrix.platform == 'windows-latest'
+        uses: ./.github/actions/windows-signing
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          account: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          profile: ${{ secrets.AZURE_SIGNING_PROFILE }}
+          description: Baalda Staging
+
       # Two steps rather than one with conditional env, exactly as release.yml
       # does: blanking APPLE_ID/PASSWORD/TEAM_ID does NOT disable notarization,
       # because a GitHub expression yields an empty STRING, not an unset
@@ -544,6 +560,10 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Azure Artifact Signing credentials for the signCommand (Windows only).
+          AZURE_CLIENT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_TENANT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_TENANT_ID || '' }}
         with:
           projectPath: app/apps/desktop
           # A literal tag, not `v__VERSION__`: this is one rolling prerelease
@@ -558,7 +578,7 @@ jobs:
           prerelease: true
           # Windows staging has no MSI, so point latest.json at the NSIS bundle.
           updaterJsonPreferNsis: true
-          args: ${{ matrix.args }} --config src-tauri/tauri.staging.conf.json --config src-tauri/tauri.staging.build.conf.json
+          args: ${{ matrix.args }} --config src-tauri/tauri.staging.conf.json --config src-tauri/tauri.staging.build.conf.json ${{ steps.winsign.outputs.config_arg }}
 
       # Same build, minus the three notarization variables. Tauri logs
       # "skipping app notarization, no APPLE_ID & APPLE_PASSWORD & APPLE_TEAM_ID"
@@ -580,6 +600,9 @@ jobs:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          AZURE_CLIENT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_TENANT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_TENANT_ID || '' }}
         with:
           projectPath: app/apps/desktop
           tagName: staging
@@ -588,4 +611,9 @@ jobs:
           releaseDraft: false
           prerelease: true
           updaterJsonPreferNsis: true
-          args: ${{ matrix.args }} --config src-tauri/tauri.staging.conf.json --config src-tauri/tauri.staging.build.conf.json
+          args: ${{ matrix.args }} --config src-tauri/tauri.staging.conf.json --config src-tauri/tauri.staging.build.conf.json ${{ steps.winsign.outputs.config_arg }}
+
+      - name: Verify Windows signatures
+        if: matrix.platform == 'windows-latest' && steps.winsign.outputs.config_arg != ''
+        shell: pwsh
+        run: ./.github/scripts/verify-windows-signatures.ps1
