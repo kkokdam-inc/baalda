@@ -1,4 +1,5 @@
 import { getSession } from "./session.js";
+import { signupAllowed } from "./signup-domain.js";
 import { auditRequestActor, attributeMembershipEvent } from "../audit/access.js";
 import { accessAuditRoutes } from "./routes/access-audit.js";
 import { Hono } from "hono";
@@ -315,6 +316,14 @@ export function createApp(deps: AppDeps): Hono {
   // Better Auth owns everything under /api/auth (web-standard Request handler).
   // Email sign-in passes the per-account failure throttle first (#237).
   app.post("/api/auth/sign-in/email", (c) => throttledSignIn(c.req.raw, auth.handler));
+  // KKOKDAM fork: self-service sign-up only for SIGNUP_ALLOWED_DOMAINS (see signup-domain.ts).
+  app.post("/api/auth/sign-up/email", async (c) => {
+    const body = await c.req.raw.clone().json().catch(() => null);
+    if (!signupAllowed(body, process.env.SIGNUP_ALLOWED_DOMAINS)) {
+      return c.json({ error: "Sign-up is limited to company accounts" }, 403);
+    }
+    return auth.handler(c.req.raw);
+  });
   app.on(["GET", "POST"], "/api/auth/*", async (c) => {
     if (c.req.method !== "POST" || !c.req.path.startsWith("/api/auth/organization/")) {
       return auth.handler(c.req.raw);
