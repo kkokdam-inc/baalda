@@ -5,6 +5,7 @@ describe("tokenize", () => {
   it("keeps Hangul words so Korean queries can match", () => {
     expect(tokenize("발주서 상세 처리 기준")).toEqual(["발주서", "상세", "처리", "기준"]);
     expect(tokenize("월결산 2026-10 Close_v2")).toEqual(["월결산", "2026", "10", "close_v2"]);
+    expect(tokenize("가".normalize("NFD"))).toEqual(["가"]);
   });
 
   it("gives Korean text a non-zero vector that matches the same words", () => {

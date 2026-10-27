@@ -21,7 +21,8 @@ export interface Embedder {
 /** Split into lowercase word tokens (letter/digit/underscore runs, any script —
  *  Hangul, CJK, accented Latin; ASCII-only runs made every Korean query score 0). */
 export function tokenize(text: string): string[] {
-  const matches = text.toLowerCase().match(/[\p{L}\p{N}_]+/gu);
+  // NFC first: the same Hangul word typed precomposed or decomposed is one token.
+  const matches = text.normalize("NFC").toLowerCase().match(/[\p{L}\p{N}_]+/gu);
   return matches ?? [];
 }
 
