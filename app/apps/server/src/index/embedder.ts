@@ -18,9 +18,10 @@ export interface Embedder {
   embed(text: string): number[];
 }
 
-/** Split into lowercase word tokens (letters/digits/underscore runs). */
+/** Split into lowercase word tokens (letter/digit/underscore runs, any script —
+ *  Hangul, CJK, accented Latin; ASCII-only runs made every Korean query score 0). */
 export function tokenize(text: string): string[] {
-  const matches = text.toLowerCase().match(/[a-z0-9_]+/g);
+  const matches = text.toLowerCase().match(/[\p{L}\p{N}_]+/gu);
   return matches ?? [];
 }
 
